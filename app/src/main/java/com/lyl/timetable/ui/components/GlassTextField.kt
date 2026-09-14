@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -21,7 +23,8 @@ import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.AppType
 
 /**
- * iOS 风格的填充式输入框：无边框、圆角、灰底，聚焦时以强调色细描边提示。
+ * iOS 风格的填充式输入框：无边框、圆角、灰底。
+ * 可通过 [focusRequester] 在出现时自动聚焦并唤起键盘。
  */
 @Composable
 fun GlassTextField(
@@ -32,7 +35,8 @@ fun GlassTextField(
     singleLine: Boolean = true,
     minLines: Int = 1,
     keyboardType: KeyboardType = KeyboardType.Text,
-    imeAction: ImeAction = ImeAction.Default
+    imeAction: ImeAction = ImeAction.Default,
+    focusRequester: FocusRequester? = null
 ) {
     val p = AppTheme.colors
     val shape = RoundedCornerShape(AppDimens.InnerRadius)
@@ -50,7 +54,9 @@ fun GlassTextField(
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
             textStyle = AppType.Body.copy(color = p.textPrimary),
             cursorBrush = SolidColor(p.accent),
             singleLine = singleLine,

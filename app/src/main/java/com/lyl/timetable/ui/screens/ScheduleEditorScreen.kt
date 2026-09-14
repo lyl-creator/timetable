@@ -32,6 +32,7 @@ import com.lyl.timetable.data.TimeSlot
 import com.lyl.timetable.data.TimeText
 import com.lyl.timetable.ui.components.GlassIconButton
 import com.lyl.timetable.ui.components.GroupSection
+import com.lyl.timetable.ui.components.NumberInputDialog
 import com.lyl.timetable.ui.components.PillButton
 import com.lyl.timetable.ui.components.RowItem
 import com.lyl.timetable.ui.components.RowSeparator
@@ -58,6 +59,7 @@ fun ScheduleEditorScreen(
     val p = AppTheme.colors
     val template = settings.scheduleTemplate
     var editingSlot by remember { mutableStateOf<TimeSlot?>(null) }
+    var editingBreakAfter by remember { mutableStateOf<Int?>(null) }
     var confirmGenerate by remember { mutableStateOf(false) }
 
     fun updateTemplate(block: (ScheduleTemplate) -> ScheduleTemplate) {
@@ -233,18 +235,51 @@ fun ScheduleEditorScreen(
             }
 
             item {
-                GroupSection {
+                GroupSection(
+                    footer = "点击某一节可单独调整开始时间、结束时间与时长；点击课间可单独调整该课间的长短。" +
+                            "改动后其后的节次会自动顺延（跨时段时回到该时段的固定开始时间）。"
+                ) {
                     val slots = settings.timeSlots
+                    val total = slots.size
                     slots.forEachIndexed { index, slot ->
                         val minutes = TimeText.minutesBetween(slot.startTime, slot.endTime)
+                            ?: template.lessonMinutesAt(slot.section)
                         RowItem(
                             title = "第 ${slot.section} 节",
-                            subtitle = minutes?.let { "$it 分钟" },
-                            value = "${slot.startTime} – ${slot.endTime}",
+                            subtitle = "${slot.startTime} – ${slot.endTime}",
+                            value = "$minutes 分钟",
                             showChevron = true,
                             onClick = { editingSlot = slot }
                         )
-                        if (index != slots.lastIndex) RowSeparator()
+                        // 最后一节之后没有课间，因此不显示
+                        if (index != slots.lastIndex) {
+                            RowSeparator(inset = AppDimens.SeparatorInset)
+                            val gap = template.breakMinutesAfter(slot.section)
+                            RowItem(
+                                title = "课间",
+                                subtitle = "第 ${slot.section} 节之后",
+                                value = "$gap 分钟",
+                                showChevron = true,
+                                trailing = {
+                                    if (template.breakOverrides.containsKey(slot.section)) {
+                                        Text(
+                                            text = "已自定义",
+                                            style = AppType.Caption2,
+                                            color = p.accent
+                                        )
+                                    }
+                                },
+                                onClick = { editingBreakAfter = slot.section }
+                            )
+                        }
+                        if (index != slots.lastIndex) RowSeparator(inset = AppDimens.SeparatorInset)
+                    }
+                    if (total == 0) {
+                        RowItem(
+                            title = "暂无节次",
+                            subtitle = "请先在上方设置每天节数并生成时间表",
+                            centered = true
+                        )
                     }
                 }
             }
@@ -257,11 +292,47 @@ fun ScheduleEditorScreen(
             slot = slot,
             onDismiss = { editingSlot = null },
             onConfirm = { start, end ->
-                val updated = settings.timeSlots.map {
+                val minutes = TimeText.minutesBetween(start, end)
+                    ?: template.lessonMinutesAt(slot.section)
+                val newTemplate = template.copy(
+                    lessonOverrides = template.lessonOverrides + (slot.section to minutes)
+                )
+                val withEdited = settings.timeSlots.map {
                     if (it.section == slot.section) it.copy(startTime = start, endTime = end) else it
                 }
-                onSettingsChange(settings.copy(timeSlots = updated))
+                onSettingsChange(
+                    settings.copy(
+                        scheduleTemplate = newTemplate,
+                        // 该节的时长变化后，其后的节次自动顺延
+                        timeSlots = newTemplate.reflow(withEdited, slot.section)
+                    )
+                )
                 editingSlot = null
+            }
+        )
+    }
+
+    // ---------------- 课间编辑 ----------------
+    editingBreakAfter?.let { afterSection ->
+        NumberInputDialog(
+            title = "第 $afterSection 节之后的课间",
+            initial = template.breakMinutesAfter(afterSection),
+            range = 0..120,
+            suffix = " 分钟",
+            hint = "该时长决定第 ${afterSection + 1} 节的开始时间",
+            onDismiss = { editingBreakAfter = null },
+            onConfirm = { minutes ->
+                val newTemplate = template.copy(
+                    breakOverrides = template.breakOverrides + (afterSection to minutes)
+                )
+                onSettingsChange(
+                    settings.copy(
+                        scheduleTemplate = newTemplate,
+                        // 课间变化后，从下一节起整体顺延
+                        timeSlots = newTemplate.reflow(settings.timeSlots, afterSection + 1)
+                    )
+                )
+                editingBreakAfter = null
             }
         )
     }

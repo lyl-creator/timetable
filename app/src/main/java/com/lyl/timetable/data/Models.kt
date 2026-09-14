@@ -150,9 +150,21 @@ data class ScheduleTemplate(
     val eveningStart: String = "19:00",
     val eveningCount: Int = 4,
     val lessonMinutes: Int = 45,
-    val breakMinutes: Int = 10
+    val breakMinutes: Int = 10,
+    /** 第 n 节单独指定的时长（分钟）；缺省时使用 [lessonMinutes] */
+    val lessonOverrides: Map<Int, Int> = emptyMap(),
+    /** 第 n 节之后那个课间的时长（分钟）；缺省时使用 [breakMinutes] */
+    val breakOverrides: Map<Int, Int> = emptyMap()
 ) {
     val totalCount: Int get() = morningCount + afternoonCount + eveningCount
+
+    /** 第 [section] 节的时长 */
+    fun lessonMinutesAt(section: Int): Int =
+        (lessonOverrides[section] ?: lessonMinutes).coerceIn(1, 300)
+
+    /** 第 [section] 节之后的课间时长 */
+    fun breakMinutesAfter(section: Int): Int =
+        (breakOverrides[section] ?: breakMinutes).coerceIn(0, 120)
 
     fun toTimeSlots(): List<TimeSlot> {
         val out = ArrayList<TimeSlot>(totalCount)
@@ -162,9 +174,10 @@ data class ScheduleTemplate(
             val start = TimeText.parse(startText) ?: return
             var cursor = start
             repeat(count.coerceAtLeast(0)) {
-                val end = cursor.plusMinutes(lessonMinutes.coerceAtLeast(1).toLong())
-                out.add(TimeSlot(section++, TimeText.format(cursor), TimeText.format(end)))
-                cursor = end.plusMinutes(breakMinutes.coerceAtLeast(0).toLong())
+                val current = section++
+                val end = cursor.plusMinutes(lessonMinutesAt(current).toLong())
+                out.add(TimeSlot(current, TimeText.format(cursor), TimeText.format(end)))
+                cursor = end.plusMinutes(breakMinutesAfter(current).toLong())
             }
         }
 
@@ -172,6 +185,53 @@ data class ScheduleTemplate(
         appendBlock(afternoonStart, afternoonCount)
         appendBlock(eveningStart, eveningCount)
         return out
+    }
+
+    /** 是否存在逐节 / 逐课间的自定义设置 */
+    val hasOverrides: Boolean get() = lessonOverrides.isNotEmpty() || breakOverrides.isNotEmpty()
+
+    /** 每个时段第一节的固定开始时间（下午 / 晚间不会因上午变化而被推移） */
+    fun segmentStartSections(): Map<Int, String> {
+        val map = LinkedHashMap<Int, String>(3)
+        var section = 1
+        if (morningCount > 0) {
+            map[section] = morningStart
+            section += morningCount
+        }
+        if (afternoonCount > 0) {
+            map[section] = afternoonStart
+            section += afternoonCount
+        }
+        if (eveningCount > 0) map[section] = eveningStart
+        return map
+    }
+
+    /**
+     * 从第 [startSection] 节起按当前模板参数重排时间，用于「改了某节时长或某个课间后，
+     * 其后的节次自动顺延」。遇到时段边界（下午 / 晚间第一节）时使用该段的固定开始时间。
+     */
+    fun reflow(slots: List<TimeSlot>, startSection: Int): List<TimeSlot> {
+        if (slots.isEmpty()) return slots
+        val boundaries = segmentStartSections()
+        val result = ArrayList<TimeSlot>(slots.size)
+        var cursor: String? = null
+
+        for (slot in slots) {
+            val affected = slot.section >= startSection
+            val start = if (affected) {
+                boundaries[slot.section] ?: cursor ?: slot.startTime
+            } else {
+                slot.startTime
+            }
+            val end = if (affected) {
+                TimeText.plus(start, lessonMinutesAt(slot.section)) ?: slot.endTime
+            } else {
+                slot.endTime
+            }
+            result.add(if (affected) slot.copy(startTime = start, endTime = end) else slot)
+            cursor = TimeText.plus(end, breakMinutesAfter(slot.section))
+        }
+        return result
     }
 }
 

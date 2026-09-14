@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.lyl.timetable.ui.theme.AppDimens
 import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.AppType
+import com.lyl.timetable.ui.theme.hazeGlass
 import com.lyl.timetable.ui.theme.liquidGlass
+import dev.chrisbanes.haze.HazeState
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     WEEK("课表", Icons.Rounded.CalendarMonth),
@@ -44,20 +46,32 @@ enum class AppTab(val label: String, val icon: ImageVector) {
 
 /**
  * 底部玻璃 Tab Bar（iOS 26 的浮动胶囊形态）。
- * 选中项使用强调色，图标带轻微弹性缩放。
+ * 传入 [hazeState] 时使用真实背景模糊，否则回退为半透明玻璃。
  */
 @Composable
 fun FloatingTabBar(
     current: AppTab,
     onSelect: (AppTab) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null
 ) {
-    val p = AppTheme.colors
+    val glass = if (hazeState != null) {
+        Modifier.hazeGlass(
+            state = hazeState,
+            radius = AppDimens.Capsule,
+            blurRadius = 30.dp,
+            elevation = 16.dp,
+            strong = true
+        )
+    } else {
+        Modifier.liquidGlass(radius = AppDimens.Capsule, strong = true, elevation = 14.dp)
+    }
+
     Row(
         modifier = modifier
             .height(58.dp)
             .fillMaxWidth()
-            .liquidGlass(radius = AppDimens.Capsule, strong = true, elevation = 14.dp)
+            .then(glass)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly

@@ -30,6 +30,9 @@ import com.lyl.timetable.ui.screens.SettingsScreen
 import com.lyl.timetable.ui.screens.TodayScreen
 import com.lyl.timetable.ui.screens.WeekScreen
 import com.lyl.timetable.ui.theme.AppTheme
+import com.lyl.timetable.ui.theme.ambientBackdrop
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 
 private data class EditorRequest(
     val course: Course?,
@@ -58,6 +61,7 @@ fun AppRoot(
     }
 
     val autoWeek = repository.currentWeek()
+    val hazeState = remember { HazeState() }
 
     AppTheme(themeMode = settings.themeMode, accentIndex = settings.accentIndex) {
         val p = AppTheme.colors
@@ -67,72 +71,77 @@ fun AppRoot(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(p.background)
+                    // iOS 26 观感：底色之上的柔光斑，让浮层玻璃有可透出的色彩层次
+                    .ambientBackdrop()
                     .windowInsetsPadding(WindowInsets.statusBars)
             ) {
-                when {
-                    showImport -> ImportScreen(
-                        initialUri = importUri,
-                        onBack = {
-                            showImport = false
-                            importUri = null
-                        },
-                        onConfirmImport = { imported, replace ->
-                            repository.importCourses(imported, replace)
-                            showImport = false
-                            importUri = null
-                            week = repository.currentWeek()
-                            tab = AppTab.WEEK
-                        }
-                    )
+                // 标记为可被浮层采样并模糊的内容源
+                Box(modifier = Modifier.fillMaxSize().haze(hazeState)) {
+                    when {
+                        showImport -> ImportScreen(
+                            initialUri = importUri,
+                            onBack = {
+                                showImport = false
+                                importUri = null
+                            },
+                            onConfirmImport = { imported, replace ->
+                                repository.importCourses(imported, replace)
+                                showImport = false
+                                importUri = null
+                                week = repository.currentWeek()
+                                tab = AppTab.WEEK
+                            }
+                        )
 
-                    showSchedule -> ScheduleEditorScreen(
-                        settings = settings,
-                        onSettingsChange = { repository.updateSettings(it) },
-                        onBack = { showSchedule = false }
-                    )
+                        showSchedule -> ScheduleEditorScreen(
+                            settings = settings,
+                            onSettingsChange = { repository.updateSettings(it) },
+                            onBack = { showSchedule = false }
+                        )
 
-                    else -> Crossfade(
-                        targetState = tab,
-                        animationSpec = tween(220),
-                        label = "tab"
-                    ) { current ->
-                        when (current) {
-                            AppTab.WEEK -> WeekScreen(
-                                courses = courses,
-                                settings = settings,
-                                week = week,
-                                autoWeek = autoWeek,
-                                onWeekChange = { week = it },
-                                onCourseClick = { editorRequest = EditorRequest(it) },
-                                onEmptyAreaClick = { day, section ->
-                                    editorRequest = EditorRequest(null, day, section)
-                                },
-                                onImport = {
-                                    importUri = null
-                                    showImport = true
-                                }
-                            )
+                        else -> Crossfade(
+                            targetState = tab,
+                            animationSpec = tween(220),
+                            label = "tab"
+                        ) { current ->
+                            when (current) {
+                                AppTab.WEEK -> WeekScreen(
+                                    courses = courses,
+                                    settings = settings,
+                                    week = week,
+                                    autoWeek = autoWeek,
+                                    onWeekChange = { week = it },
+                                    onCourseClick = { editorRequest = EditorRequest(it) },
+                                    onEmptyAreaClick = { day, section ->
+                                        editorRequest = EditorRequest(null, day, section)
+                                    },
+                                    onImport = {
+                                        importUri = null
+                                        showImport = true
+                                    }
+                                )
 
-                            AppTab.TODAY -> TodayScreen(
-                                courses = courses,
-                                settings = settings,
-                                week = week,
-                                onCourseClick = { editorRequest = EditorRequest(it) },
-                                onAddCourse = { editorRequest = EditorRequest(null) }
-                            )
+                                AppTab.TODAY -> TodayScreen(
+                                    courses = courses,
+                                    settings = settings,
+                                    week = week,
+                                    onCourseClick = { editorRequest = EditorRequest(it) },
+                                    onAddCourse = { editorRequest = EditorRequest(null) }
+                                )
 
-                            AppTab.SETTINGS -> SettingsScreen(
-                                settings = settings,
-                                courses = courses,
-                                onSettingsChange = { repository.updateSettings(it) },
-                                onImport = {
-                                    importUri = null
-                                    showImport = true
-                                },
-                                onClearAll = { repository.clearCourses() },
-                                onEditCourse = { editorRequest = EditorRequest(it) },
-                                onOpenSchedule = { showSchedule = true }
-                            )
+                                AppTab.SETTINGS -> SettingsScreen(
+                                    settings = settings,
+                                    courses = courses,
+                                    onSettingsChange = { repository.updateSettings(it) },
+                                    onImport = {
+                                        importUri = null
+                                        showImport = true
+                                    },
+                                    onClearAll = { repository.clearCourses() },
+                                    onEditCourse = { editorRequest = EditorRequest(it) },
+                                    onOpenSchedule = { showSchedule = true }
+                                )
+                            }
                         }
                     }
                 }
@@ -141,6 +150,7 @@ fun AppRoot(
                     FloatingTabBar(
                         current = tab,
                         onSelect = { tab = it },
+                        hazeState = hazeState,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .windowInsetsPadding(WindowInsets.navigationBars)

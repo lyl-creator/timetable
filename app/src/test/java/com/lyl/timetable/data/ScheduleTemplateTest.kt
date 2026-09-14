@@ -105,4 +105,85 @@ class ScheduleTemplateTest {
         // 跨零点按次日计算
         assertEquals(30, TimeText.minutesBetween("23:50", "00:20"))
     }
+
+    // ---------------- 逐节时长 / 逐课间 ----------------
+
+    @Test
+    fun `每节课时长与每个课间都可单独设置`() {
+        val template = ScheduleTemplate(
+            morningStart = "08:00", morningCount = 3,
+            afternoonCount = 0, eveningCount = 0,
+            lessonMinutes = 45, breakMinutes = 10,
+            lessonOverrides = mapOf(2 to 60),   // 第 2 节上 60 分钟
+            breakOverrides = mapOf(1 to 20)     // 第 1 节之后课间 20 分钟
+        )
+        val slots = template.toTimeSlots()
+
+        assertEquals(60, template.lessonMinutesAt(2))
+        assertEquals(45, template.lessonMinutesAt(1))
+        assertEquals(20, template.breakMinutesAfter(1))
+        assertEquals(10, template.breakMinutesAfter(2))
+
+        assertEquals(TimeSlot(1, "08:00", "08:45"), slots[0])
+        assertEquals(TimeSlot(2, "09:05", "10:05"), slots[1])   // 课间 20 分钟 + 本节 60 分钟
+        assertEquals(TimeSlot(3, "10:15", "11:00"), slots[2])   // 第 2 节后仍是默认 10 分钟
+        assertTrue(template.hasOverrides)
+    }
+
+    @Test
+    fun `改动某节时长后其后的节次自动顺延`() {
+        val base = ScheduleTemplate(
+            morningStart = "08:00", morningCount = 3,
+            afternoonCount = 0, eveningCount = 0,
+            lessonMinutes = 45, breakMinutes = 10
+        )
+        val slots = base.toTimeSlots()
+        val changed = base.copy(lessonOverrides = mapOf(1 to 60))
+        val reflowed = changed.reflow(slots, 1)
+
+        assertEquals("08:00", reflowed[0].startTime)
+        assertEquals("09:00", reflowed[0].endTime)
+        assertEquals("09:10", reflowed[1].startTime)
+        assertEquals("09:55", reflowed[1].endTime)
+        assertEquals("10:05", reflowed[2].startTime)
+    }
+
+    @Test
+    fun `顺延时遇到时段边界会回到该时段的固定开始时间`() {
+        val base = ScheduleTemplate(
+            morningStart = "08:00", morningCount = 2,
+            afternoonStart = "14:00", afternoonCount = 2,
+            eveningCount = 0,
+            lessonMinutes = 45, breakMinutes = 10
+        )
+        val slots = base.toTimeSlots()
+        val changed = base.copy(lessonOverrides = mapOf(1 to 90))
+        val reflowed = changed.reflow(slots, 1)
+
+        // 上午被拉长
+        assertEquals("09:30", reflowed[0].endTime)
+        assertEquals("09:40", reflowed[1].startTime)
+        // 下午第一节不受上午影响，仍按 14:00 开始
+        assertEquals("14:00", reflowed[2].startTime)
+        assertEquals("14:45", reflowed[2].endTime)
+    }
+
+    @Test
+    fun `调整课间会让后续节次整体顺延`() {
+        val base = ScheduleTemplate(
+            morningStart = "08:00", morningCount = 3,
+            afternoonCount = 0, eveningCount = 0,
+            lessonMinutes = 45, breakMinutes = 10
+        )
+        val slots = base.toTimeSlots()
+        val changed = base.copy(breakOverrides = mapOf(1 to 30))
+        // 从第 2 节起顺延
+        val reflowed = changed.reflow(slots, 2)
+
+        assertEquals("08:00", reflowed[0].startTime)
+        assertEquals("08:45", reflowed[0].endTime)
+        assertEquals("09:15", reflowed[1].startTime)   // 08:45 + 30
+        assertEquals("10:00", reflowed[1].endTime)
+        assertEquals("10:10", reflowed[2].startTime)
+    }
 }

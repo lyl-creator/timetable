@@ -29,8 +29,8 @@ android {
         applicationId = "com.lyl.timetable"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.4.0"
         resourceConfigurations += listOf("zh", "en")
     }
 
@@ -116,6 +116,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    // Liquid Glass 的真实背景模糊（API 31+ 使用 RenderEffect，低版本自动回退为半透明）
+    implementation("dev.chrisbanes.haze:haze:0.7.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

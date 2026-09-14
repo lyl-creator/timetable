@@ -47,8 +47,25 @@ internal class SettingsStore(context: Context) {
         t.morningStart, t.morningCount.toString(),
         t.afternoonStart, t.afternoonCount.toString(),
         t.eveningStart, t.eveningCount.toString(),
-        t.lessonMinutes.toString(), t.breakMinutes.toString()
+        t.lessonMinutes.toString(), t.breakMinutes.toString(),
+        encodeOverrides(t.lessonOverrides), encodeOverrides(t.breakOverrides)
     ).joinToString("|")
+
+    private fun encodeOverrides(map: Map<Int, Int>): String =
+        map.entries.sortedBy { it.key }.joinToString(";") { "${it.key}:${it.value}" }
+
+    private fun decodeOverrides(raw: String?): Map<Int, Int> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        val out = LinkedHashMap<Int, Int>()
+        for (part in raw.split(';')) {
+            val f = part.split(':')
+            if (f.size != 2) continue
+            val section = f[0].trim().toIntOrNull() ?: continue
+            val minutes = f[1].trim().toIntOrNull() ?: continue
+            if (section in 1..31 && minutes in 0..300) out[section] = minutes
+        }
+        return out
+    }
 
     private fun decodeTemplate(raw: String?): ScheduleTemplate {
         if (raw.isNullOrBlank()) return ScheduleTemplate()
@@ -63,7 +80,9 @@ internal class SettingsStore(context: Context) {
             eveningStart = f[4].takeIf { TimeText.isValid(it) } ?: fallback.eveningStart,
             eveningCount = f[5].toIntOrNull()?.coerceIn(0, 12) ?: fallback.eveningCount,
             lessonMinutes = f[6].toIntOrNull()?.coerceIn(20, 180) ?: fallback.lessonMinutes,
-            breakMinutes = f[7].toIntOrNull()?.coerceIn(0, 60) ?: fallback.breakMinutes
+            breakMinutes = f[7].toIntOrNull()?.coerceIn(0, 60) ?: fallback.breakMinutes,
+            lessonOverrides = decodeOverrides(f.getOrNull(8)),
+            breakOverrides = decodeOverrides(f.getOrNull(9))
         )
     }
 
