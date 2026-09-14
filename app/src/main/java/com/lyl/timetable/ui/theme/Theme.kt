@@ -10,28 +10,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.lyl.timetable.data.ThemeMode
 
-val LocalOriginPalette = staticCompositionLocalOf { LightPalette }
+val LocalAppPalette = staticCompositionLocalOf { LightPalette }
 val LocalAccentIndex = staticCompositionLocalOf { 0 }
 
 /** 全局取值入口 */
-object OriginTheme {
-    val colors: OriginPalette
-        @Composable get() = LocalOriginPalette.current
+object AppTheme {
+    val colors: AppPalette
+        @Composable get() = LocalAppPalette.current
 
-    val accentStart: Color
-        @Composable get() = AccentPalette[LocalAccentIndex.current % AccentPalette.size].start
+    val accent: Color
+        @Composable get() = colors.accent
 
-    val accentEnd: Color
-        @Composable get() = AccentPalette[LocalAccentIndex.current % AccentPalette.size].end
+    val accentOption: AccentOption
+        @Composable get() = AccentOptions[LocalAccentIndex.current.coerceIn(0, AccentOptions.size - 1)]
 }
 
 @Composable
-fun OriginTheme(
+fun AppTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     accentIndex: Int = 0,
     content: @Composable () -> Unit
@@ -42,8 +41,8 @@ fun OriginTheme(
         ThemeMode.DARK -> true
     }
     val base = if (dark) DarkPalette else LightPalette
-    val accent = AccentPalette[accentIndex.coerceIn(0, AccentPalette.size - 1)]
-    val palette = base.copy(accent = accent.start, accentEnd = accent.end)
+    val option = AccentOptions[accentIndex.coerceIn(0, AccentOptions.size - 1)]
+    val palette = base.copy(accent = if (dark) option.darkColor else option.color)
 
     // 状态栏 / 导航栏图标明暗跟随主题
     val view = LocalView.current
@@ -61,40 +60,40 @@ fun OriginTheme(
         darkColorScheme(
             primary = palette.accent,
             onPrimary = palette.onAccent,
-            secondary = palette.accentEnd,
+            secondary = palette.accent,
             background = palette.background,
             onBackground = palette.textPrimary,
             surface = palette.card,
             onSurface = palette.textPrimary,
-            surfaceVariant = palette.cardElevated,
+            surfaceVariant = palette.fill,
             onSurfaceVariant = palette.textSecondary,
-            outline = palette.divider,
+            outline = palette.separator,
             error = palette.danger
         )
     } else {
         lightColorScheme(
             primary = palette.accent,
             onPrimary = palette.onAccent,
-            secondary = palette.accentEnd,
+            secondary = palette.accent,
             background = palette.background,
             onBackground = palette.textPrimary,
             surface = palette.card,
             onSurface = palette.textPrimary,
-            surfaceVariant = palette.cardElevated,
+            surfaceVariant = palette.fill,
             onSurfaceVariant = palette.textSecondary,
-            outline = palette.divider,
+            outline = palette.separator,
             error = palette.danger
         )
     }
 
     CompositionLocalProvider(
-        LocalOriginPalette provides palette,
+        LocalAppPalette provides palette,
         LocalAccentIndex provides accentIndex
     ) {
         MaterialTheme(
             colorScheme = scheme,
-            typography = OriginTypography,
-            shapes = OriginShapes,
+            typography = AppTypography,
+            shapes = AppShapes,
             content = content
         )
     }

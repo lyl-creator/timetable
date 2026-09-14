@@ -25,10 +25,11 @@ import com.lyl.timetable.data.Course
 import com.lyl.timetable.data.TimetableRepository
 import com.lyl.timetable.ui.screens.CourseEditorSheet
 import com.lyl.timetable.ui.screens.ImportScreen
+import com.lyl.timetable.ui.screens.ScheduleEditorScreen
 import com.lyl.timetable.ui.screens.SettingsScreen
 import com.lyl.timetable.ui.screens.TodayScreen
 import com.lyl.timetable.ui.screens.WeekScreen
-import com.lyl.timetable.ui.theme.OriginTheme
+import com.lyl.timetable.ui.theme.AppTheme
 
 private data class EditorRequest(
     val course: Course?,
@@ -48,27 +49,28 @@ fun AppRoot(
     var week by remember { mutableStateOf(repository.currentWeek()) }
     var showImport by remember { mutableStateOf(incomingUri != null) }
     var importUri by remember { mutableStateOf(incomingUri) }
+    var showSchedule by remember { mutableStateOf(false) }
     var editorRequest by remember { mutableStateOf<EditorRequest?>(null) }
 
-    // 开学日期或手动指定周次变化后，重新对齐当前周
+    // 学期起始日期或手动指定周次变化后，重新对齐当前周
     LaunchedEffect(settings.termStartDate, settings.currentWeekOverride) {
         week = repository.currentWeek()
     }
 
     val autoWeek = repository.currentWeek()
 
-    OriginTheme(themeMode = settings.themeMode, accentIndex = settings.accentIndex) {
-        val palette = OriginTheme.colors
+    AppTheme(themeMode = settings.themeMode, accentIndex = settings.accentIndex) {
+        val p = AppTheme.colors
 
-        Surface(modifier = Modifier.fillMaxSize(), color = palette.background) {
+        Surface(modifier = Modifier.fillMaxSize(), color = p.background) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(palette.background)
+                    .background(p.background)
                     .windowInsetsPadding(WindowInsets.statusBars)
             ) {
-                if (showImport) {
-                    ImportScreen(
+                when {
+                    showImport -> ImportScreen(
                         initialUri = importUri,
                         onBack = {
                             showImport = false
@@ -82,8 +84,14 @@ fun AppRoot(
                             tab = AppTab.WEEK
                         }
                     )
-                } else {
-                    Crossfade(
+
+                    showSchedule -> ScheduleEditorScreen(
+                        settings = settings,
+                        onSettingsChange = { repository.updateSettings(it) },
+                        onBack = { showSchedule = false }
+                    )
+
+                    else -> Crossfade(
                         targetState = tab,
                         animationSpec = tween(220),
                         label = "tab"
@@ -122,19 +130,22 @@ fun AppRoot(
                                     showImport = true
                                 },
                                 onClearAll = { repository.clearCourses() },
-                                onEditCourse = { editorRequest = EditorRequest(it) }
+                                onEditCourse = { editorRequest = EditorRequest(it) },
+                                onOpenSchedule = { showSchedule = true }
                             )
                         }
                     }
+                }
 
-                    FloatingBottomBar(
+                if (!showImport && !showSchedule) {
+                    FloatingTabBar(
                         current = tab,
                         onSelect = { tab = it },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(horizontal = 18.dp)
-                            .padding(bottom = 14.dp)
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 10.dp)
                     )
                 }
             }
@@ -150,11 +161,8 @@ fun AppRoot(
                 defaultSection = request.section.coerceIn(1, settings.sectionCount),
                 onDismiss = { editorRequest = null },
                 onSave = { course ->
-                    if (course.id == 0L) {
-                        repository.addCourse(course)
-                    } else {
-                        repository.updateCourse(course)
-                    }
+                    if (course.id == 0L) repository.addCourse(course)
+                    else repository.updateCourse(course)
                     editorRequest = null
                 },
                 onDelete = { course ->

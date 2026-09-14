@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Upload
@@ -30,11 +29,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -54,14 +49,21 @@ import androidx.compose.ui.window.DialogProperties
 import com.lyl.timetable.data.AppSettings
 import com.lyl.timetable.data.Course
 import com.lyl.timetable.data.ThemeMode
-import com.lyl.timetable.data.TimeSlot
 import com.lyl.timetable.data.TimetableRepository
-import com.lyl.timetable.ui.SettingsGroup
-import com.lyl.timetable.ui.components.LargeTitle
-import com.lyl.timetable.ui.components.SettingRow
-import com.lyl.timetable.ui.theme.AccentPalette
-import com.lyl.timetable.ui.theme.OriginTheme
+import com.lyl.timetable.ui.components.ColorDot
+import com.lyl.timetable.ui.components.GlassIconButton
+import com.lyl.timetable.ui.components.GroupSection
+import com.lyl.timetable.ui.components.LargeTitleHeader
+import com.lyl.timetable.ui.components.RowItem
+import com.lyl.timetable.ui.components.RowSeparator
+import com.lyl.timetable.ui.components.SegmentedPicker
+import com.lyl.timetable.ui.components.AppSwitch
+import com.lyl.timetable.ui.theme.AccentOptions
+import com.lyl.timetable.ui.theme.AppDimens
+import com.lyl.timetable.ui.theme.AppTheme
+import com.lyl.timetable.ui.theme.AppType
 import com.lyl.timetable.ui.theme.courseColor
+import com.lyl.timetable.ui.theme.groupCard
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -75,58 +77,56 @@ fun SettingsScreen(
     onImport: () -> Unit,
     onClearAll: () -> Unit,
     onEditCourse: (Course) -> Unit,
+    onOpenSchedule: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     var showDatePicker by remember { mutableStateOf(false) }
-    var editingSlot by remember { mutableStateOf<TimeSlot?>(null) }
     var showWeeksDialog by remember { mutableStateOf(false) }
-    var showSectionsDialog by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showCourseList by remember { mutableStateOf(false) }
 
     val courseNames = remember(courses) { courses.map { it.name }.distinct() }
+    val scheduleSummary = remember(settings) {
+        "${settings.timeSlots.size} 节 · 每节 ${settings.scheduleTemplate.lessonMinutes} 分钟"
+    }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().padding(horizontal = 18.dp),
-        contentPadding = PaddingValues(top = 6.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+        modifier = modifier.fillMaxSize().padding(horizontal = AppDimens.ScreenPadding),
+        contentPadding = PaddingValues(top = 6.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.GroupGap)
     ) {
         item {
-            LargeTitle(title = "设置", subtitle = "数据全部保存在本机，应用不联网")
-            Spacer(Modifier.height(2.dp))
+            LargeTitleHeader(title = "设置", subtitle = "数据全部保存在本机，应用不联网")
         }
 
         // ---------------- 学期 ----------------
         item {
-            SettingsGroup(title = "学期") {
-                SettingRow(
+            GroupSection(
+                title = "学期",
+                footer = "当前周按开学日期自动推算，也可手动指定。"
+            ) {
+                RowItem(
                     title = "开学第一周周一",
                     value = settings.termStartDate.ifBlank { "未设置" },
+                    showChevron = true,
                     onClick = { showDatePicker = true }
                 )
-                Hairline()
-                SettingRow(
+                RowSeparator()
+                RowItem(
                     title = "学期总周数",
                     value = "${settings.totalWeeks} 周",
+                    showChevron = true,
                     onClick = { showWeeksDialog = true }
                 )
-                Hairline()
-                SettingRow(
-                    title = "每日节数",
-                    value = "${settings.sectionCount} 节",
-                    subtitle = "课表默认显示行数，实际以课程为准",
-                    onClick = { showSectionsDialog = true }
-                )
-                Hairline()
-                SettingRow(
+                RowSeparator()
+                RowItem(
                     title = "当前周",
                     value = if (settings.currentWeekOverride > 0) {
-                        "手动指定：第 ${settings.currentWeekOverride} 周"
+                        "手动 · 第 ${settings.currentWeekOverride} 周"
                     } else {
-                        "按开学日期自动推算"
+                        "自动推算"
                     },
-                    subtitle = "点击可逐周手动切换，超过总周数后恢复自动",
                     onClick = {
                         val next = if (settings.currentWeekOverride >= settings.totalWeeks) 0
                         else settings.currentWeekOverride + 1
@@ -136,68 +136,71 @@ fun SettingsScreen(
             }
         }
 
+        // ---------------- 上课时间 ----------------
+        item {
+            GroupSection(
+                title = "上课时间",
+                footer = "可设置每天节数、每节时长与课间休息，并逐节微调。"
+            ) {
+                RowItem(
+                    title = "作息与节次",
+                    value = scheduleSummary,
+                    showChevron = true,
+                    onClick = onOpenSchedule
+                )
+            }
+        }
+
         // ---------------- 外观 ----------------
         item {
-            SettingsGroup(title = "外观") {
-                Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                    Text("主题模式", style = MaterialTheme.typography.bodyLarge, color = c.textPrimary)
+            GroupSection(title = "外观") {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text("主题", style = AppType.Body, color = p.textPrimary)
                     Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemeMode.entries.forEach { mode ->
-                            ChoiceChip(
-                                text = mode.label,
-                                selected = settings.themeMode == mode,
-                                onClick = { onSettingsChange(settings.copy(themeMode = mode)) }
-                            )
-                        }
-                    }
+                    SegmentedPicker(
+                        options = ThemeMode.entries.toList(),
+                        selected = settings.themeMode,
+                        onSelect = { onSettingsChange(settings.copy(themeMode = it)) },
+                        label = { it.label },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-                Hairline()
-                Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                    Text("强调色", style = MaterialTheme.typography.bodyLarge, color = c.textPrimary)
+                RowSeparator()
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text("强调色", style = AppType.Body, color = p.textPrimary)
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        AccentPalette.forEachIndexed { index, pair ->
+                        AccentOptions.forEachIndexed { index, option ->
                             val selected = settings.accentIndex == index
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
+                                    .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(pair.start)
+                                    .background(option.color)
                                     .then(
-                                        if (selected) Modifier.border(3.dp, c.textPrimary, CircleShape)
+                                        if (selected) Modifier.border(2.5.dp, p.textPrimary, CircleShape)
                                         else Modifier
                                     )
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
-                                    ) { onSettingsChange(settings.copy(accentIndex = index)) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (selected) {
-                                    Box(
-                                        Modifier
-                                            .size(10.dp)
-                                            .clip(CircleShape)
-                                            .background(c.card)
-                                    )
-                                }
-                            }
+                                    ) { onSettingsChange(settings.copy(accentIndex = index)) }
+                            )
                         }
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = AccentPalette[settings.accentIndex.coerceIn(0, AccentPalette.size - 1)].name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textTertiary
+                        text = AccentOptions[settings.accentIndex.coerceIn(0, AccentOptions.size - 1)].name,
+                        style = AppType.Caption1,
+                        color = p.textSecondary
                     )
                 }
-                Hairline()
-                SettingRow(
+                RowSeparator()
+                RowItem(
                     title = "显示周末",
                     subtitle = "关闭后课表仅显示周一至周五",
                     trailing = {
-                        Switch(
+                        AppSwitch(
                             checked = settings.showWeekend,
                             onCheckedChange = { onSettingsChange(settings.copy(showWeekend = it)) }
                         )
@@ -206,98 +209,65 @@ fun SettingsScreen(
             }
         }
 
-        // ---------------- 课程与时段 ----------------
+        // ---------------- 课程 ----------------
         item {
-            SettingsGroup(title = "课程与时段") {
-                SettingRow(
-                    title = "查看全部课程",
+            GroupSection(title = "课程") {
+                RowItem(
+                    title = "全部课程与时段",
                     value = "${courseNames.size} 门 / ${courses.size} 个时段",
-                    subtitle = "同一门课可在不同周次安排不同时间或地点",
-                    trailing = {
-                        Icon(
-                            Icons.Rounded.ChevronRight,
-                            contentDescription = null,
-                            tint = c.textTertiary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
+                    showChevron = true,
                     onClick = { showCourseList = true }
-                )
-            }
-        }
-
-        // ---------------- 作息时间 ----------------
-        item {
-            SettingsGroup(title = "作息时间") {
-                settings.timeSlots.forEachIndexed { index, slot ->
-                    SettingRow(
-                        title = "第 ${slot.section} 节",
-                        value = "${slot.startTime} - ${slot.endTime}",
-                        trailing = {
-                            Icon(
-                                Icons.Rounded.ChevronRight,
-                                contentDescription = null,
-                                tint = c.textTertiary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        onClick = { editingSlot = slot }
-                    )
-                    if (index != settings.timeSlots.lastIndex) Hairline()
-                }
-                Hairline()
-                SettingRow(
-                    title = "恢复默认作息",
-                    subtitle = "12 节制（上午 4 · 下午 4 · 晚间 4）",
-                    onClick = {
-                        onSettingsChange(settings.copy(timeSlots = TimeSlot.default(), sectionCount = 12))
-                    }
                 )
             }
         }
 
         // ---------------- 数据 ----------------
         item {
-            SettingsGroup(title = "数据") {
-                SettingRow(
+            GroupSection(
+                title = "数据",
+                footer = "支持 Excel 97-2003 (.xls)、.xlsx、网页表格伪 xls 与 csv。"
+            ) {
+                RowItem(
                     title = "导入课表文件",
-                    subtitle = "支持 .xls / .xlsx / csv 及网页表格",
-                    trailing = {
+                    leading = {
                         Icon(
                             Icons.Rounded.Upload,
                             contentDescription = null,
-                            tint = OriginTheme.accentStart,
-                            modifier = Modifier.size(20.dp)
+                            tint = p.accent,
+                            modifier = Modifier.size(22.dp)
                         )
                     },
+                    showChevron = true,
                     onClick = onImport
                 )
-                Hairline()
-                SettingRow(
+                RowSeparator()
+                RowItem(
                     title = "清空全部课程",
-                    subtitle = "删除本机所有课程数据",
-                    trailing = {
-                        Icon(Icons.Rounded.Delete, null, tint = c.danger, modifier = Modifier.size(20.dp))
+                    titleColor = p.danger,
+                    leading = {
+                        Icon(
+                            Icons.Rounded.Delete,
+                            contentDescription = null,
+                            tint = p.danger,
+                            modifier = Modifier.size(22.dp)
+                        )
                     },
                     onClick = { showClearConfirm = true }
                 )
             }
         }
 
+        // ---------------- 关于 ----------------
         item {
-            SettingsGroup(title = "关于") {
-                SettingRow(title = "版本", value = "1.0.0")
-                Hairline()
-                SettingRow(
-                    title = "课程表",
-                    subtitle = "本地离线课表 · 支持导入教务导出表格"
-                )
+            GroupSection(title = "关于") {
+                RowItem(title = "应用", value = "课程表")
+                RowSeparator()
+                RowItem(title = "版本", value = "1.1.0")
             }
         }
     }
 
-    // ---------------- 对话框 ----------------
-
+    // ---------------- 日期选择 ----------------
     if (showDatePicker) {
         val initial = TimetableRepository.parseDate(settings.termStartDate) ?: LocalDate.now()
         val state = rememberDatePickerState(
@@ -310,8 +280,7 @@ fun SettingsScreen(
                     val millis = state.selectedDateMillis
                     if (millis != null) {
                         val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                        val monday = TimetableRepository.mondayOf(date)
-                        onSettingsChange(settings.copy(termStartDate = monday.toString()))
+                        onSettingsChange(settings.copy(termStartDate = TimetableRepository.mondayOf(date).toString()))
                     }
                     showDatePicker = false
                 }) { Text("确定") }
@@ -327,46 +296,39 @@ fun SettingsScreen(
         }
     }
 
+    // ---------------- 总周数 ----------------
     if (showWeeksDialog) {
-        NumberDialog(
-            title = "学期总周数",
-            value = settings.totalWeeks,
-            range = 4..31,
-            onDismiss = { showWeeksDialog = false },
-            onConfirm = {
-                onSettingsChange(settings.copy(totalWeeks = it))
-                showWeeksDialog = false
-            }
-        )
-    }
-
-    if (showSectionsDialog) {
-        NumberDialog(
-            title = "每日节数",
-            value = settings.sectionCount,
-            range = 4..16,
-            onDismiss = { showSectionsDialog = false },
-            onConfirm = {
-                onSettingsChange(settings.copy(sectionCount = it))
-                showSectionsDialog = false
-            }
-        )
-    }
-
-    editingSlot?.let { slot ->
-        TimeSlotDialog(
-            slot = slot,
-            onDismiss = { editingSlot = null },
-            onConfirm = { start, end ->
-                val updated = settings.timeSlots.map {
-                    if (it.section == slot.section) it.copy(startTime = start, endTime = end) else it
+        var current by remember { mutableStateOf(settings.totalWeeks.toFloat()) }
+        AlertDialog(
+            onDismissRequest = { showWeeksDialog = false },
+            title = { Text("学期总周数") },
+            text = {
+                Column {
+                    Text(
+                        text = current.toInt().toString(),
+                        style = AppType.Title1,
+                        color = p.accent
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Slider(
+                        value = current,
+                        onValueChange = { current = it },
+                        valueRange = 4f..31f,
+                        steps = 26
+                    )
                 }
-                onSettingsChange(settings.copy(timeSlots = updated))
-                editingSlot = null
-            }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSettingsChange(settings.copy(totalWeeks = current.toInt().coerceIn(4, 31)))
+                    showWeeksDialog = false
+                }) { Text("确定") }
+            },
+            dismissButton = { TextButton(onClick = { showWeeksDialog = false }) { Text("取消") } }
         )
     }
 
+    // ---------------- 清空确认 ----------------
     if (showClearConfirm) {
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
@@ -376,7 +338,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     onClearAll()
                     showClearConfirm = false
-                }) { Text("清空", color = c.danger) }
+                }) { Text("清空", color = p.danger) }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirm = false }) { Text("取消") }
@@ -384,25 +346,26 @@ fun SettingsScreen(
         )
     }
 
+    // ---------------- 课程列表 ----------------
     if (showCourseList) {
-        CourseListDialog(
+        CourseListSheet(
             courses = courses,
             onDismiss = { showCourseList = false },
-            onEdit = { course ->
+            onEdit = {
                 showCourseList = false
-                onEditCourse(course)
+                onEditCourse(it)
             }
         )
     }
 }
 
 @Composable
-private fun CourseListDialog(
+private fun CourseListSheet(
     courses: List<Course>,
     onDismiss: () -> Unit,
     onEdit: (Course) -> Unit
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     val grouped = remember(courses) {
         courses.groupBy { it.name }.toList().sortedBy { it.first }
     }
@@ -411,49 +374,44 @@ private fun CourseListDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.93f)
-                .fillMaxHeight(0.82f),
-            shape = RoundedCornerShape(28.dp),
-            color = c.card
+        Box(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.86f)
+                    .groupCard()
+                    .background(p.card)
+            ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 18.dp, bottom = 10.dp),
+                    Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("课程与时段", style = MaterialTheme.typography.titleLarge, color = c.textPrimary)
+                        Text("全部课程", style = AppType.Title2, color = p.textPrimary)
                         Spacer(Modifier.height(2.dp))
                         Text(
                             "共 ${grouped.size} 门课 · ${courses.size} 个时段",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.textSecondary
+                            style = AppType.Footnote,
+                            color = p.textSecondary
                         )
                     }
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(c.cardElevated)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = onDismiss
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.Close, "关闭", tint = c.textSecondary, modifier = Modifier.size(18.dp))
-                    }
+                    GlassIconButton(
+                        icon = Icons.Rounded.Close,
+                        contentDescription = "关闭",
+                        onClick = onDismiss,
+                        size = 36.dp
+                    )
                 }
 
                 if (courses.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            "课表为空，可先导入或手动添加课程",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = c.textTertiary
+                            "课表为空，可先导入或手动添加",
+                            style = AppType.Subheadline,
+                            color = p.textTertiary
                         )
                     }
                 } else {
@@ -468,45 +426,46 @@ private fun CourseListDialog(
                                     Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        Modifier
-                                            .size(9.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                courseColor(slots.first().colorIndex).foreground(c.isLight)
-                                            )
+                                    ColorDot(
+                                        color = courseColor(slots.first().colorIndex).accent(p.isLight),
+                                        size = 9.dp
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         name,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = c.textPrimary,
+                                        style = AppType.Headline,
+                                        color = p.textPrimary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(Modifier.width(6.dp))
                                     if (slots.size > 1) {
+                                        Spacer(Modifier.width(6.dp))
                                         Text(
                                             "${slots.size} 个时段",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = OriginTheme.accentStart
+                                            style = AppType.Caption1,
+                                            color = p.accent
                                         )
                                     }
                                 }
                             }
                             items(slots.size) { index ->
                                 val course = slots[index]
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = c.cardElevated,
-                                    onClick = { onEdit(course) }
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(AppDimens.InnerRadius))
+                                        .background(p.fill)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) { onEdit(course) }
+                                        .padding(14.dp)
                                 ) {
-                                    Column(Modifier.padding(14.dp)) {
+                                    Column {
                                         Text(
                                             text = course.scheduleText,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = c.textPrimary,
+                                            style = AppType.Body,
+                                            color = p.textPrimary,
                                             fontWeight = FontWeight.Medium
                                         )
                                         Spacer(Modifier.height(3.dp))
@@ -516,8 +475,8 @@ private fun CourseListDialog(
                                                 course.location.takeIf { it.isNotBlank() },
                                                 course.teacher.takeIf { it.isNotBlank() }
                                             ).joinToString("  ·  ").ifBlank { "未填写其它信息" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = c.textSecondary
+                                            style = AppType.Footnote,
+                                            color = p.textSecondary
                                         )
                                     }
                                 }
@@ -528,130 +487,4 @@ private fun CourseListDialog(
             }
         }
     }
-}
-
-@Composable
-private fun Hairline() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = 18.dp)
-            .height(1.dp)
-            .background(OriginTheme.colors.divider)
-    )
-}
-
-@Composable
-private fun ChoiceChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val c = OriginTheme.colors
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) c.accentSoft(if (c.isLight) 0.14f else 0.24f) else c.cardElevated)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 16.dp, vertical = 9.dp)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) OriginTheme.accentStart else c.textSecondary,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-        )
-    }
-}
-
-@Composable
-private fun NumberDialog(
-    title: String,
-    value: Int,
-    range: IntRange,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    var current by remember { mutableStateOf(value.toFloat()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Text(
-                    text = current.toInt().toString(),
-                    style = MaterialTheme.typography.displayMedium,
-                    color = OriginTheme.accentStart
-                )
-                Spacer(Modifier.height(8.dp))
-                Slider(
-                    value = current,
-                    onValueChange = { current = it },
-                    valueRange = range.first.toFloat()..range.last.toFloat(),
-                    steps = (range.last - range.first - 1).coerceAtLeast(0)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(current.toInt().coerceIn(range)) }) { Text("确定") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
-}
-
-@Composable
-private fun TimeSlotDialog(
-    slot: TimeSlot,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
-) {
-    var start by remember { mutableStateOf(slot.startTime) }
-    var end by remember { mutableStateOf(slot.endTime) }
-    val valid = isValidTime(start) && isValidTime(end)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("第 ${slot.section} 节时间") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = start,
-                    onValueChange = { start = it.take(5) },
-                    label = { Text("开始时间") },
-                    singleLine = true,
-                    isError = !isValidTime(start),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = end,
-                    onValueChange = { end = it.take(5) },
-                    label = { Text("结束时间") },
-                    singleLine = true,
-                    isError = !isValidTime(end),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "格式：HH:mm，例如 08:00",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OriginTheme.colors.textTertiary
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = valid, onClick = { onConfirm(start, end) }) { Text("保存") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
-    )
-}
-
-private fun isValidTime(text: String): Boolean {
-    val t = text.trim()
-    if (t.length != 5 || t[2] != ':') return false
-    val h = t.substring(0, 2).toIntOrNull() ?: return false
-    val m = t.substring(3, 5).toIntOrNull() ?: return false
-    return h in 0..23 && m in 0..59
 }

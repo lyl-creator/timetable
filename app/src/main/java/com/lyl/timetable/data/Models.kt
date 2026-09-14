@@ -107,21 +107,11 @@ data class TimeSlot(
     val label: String get() = "$startTime"
 
     companion object {
-        /** 国内高校常见作息：12 节（上午 4 + 下午 4 + 晚间 4） */
-        fun default(): List<TimeSlot> = listOf(
-            TimeSlot(1, "08:00", "08:45"),
-            TimeSlot(2, "08:55", "09:40"),
-            TimeSlot(3, "10:00", "10:45"),
-            TimeSlot(4, "10:55", "11:40"),
-            TimeSlot(5, "14:00", "14:45"),
-            TimeSlot(6, "14:55", "15:40"),
-            TimeSlot(7, "16:00", "16:45"),
-            TimeSlot(8, "16:55", "17:40"),
-            TimeSlot(9, "19:00", "19:45"),
-            TimeSlot(10, "19:55", "20:40"),
-            TimeSlot(11, "20:50", "21:35"),
-            TimeSlot(12, "21:45", "22:30")
-        )
+        /**
+         * 默认作息：上午 4 节 + 下午 4 节 + 晚间 4 节，
+         * 每节 45 分钟、课间 10 分钟（由 [ScheduleTemplate] 统一生成，保证与设置页一致）。
+         */
+        fun default(): List<TimeSlot> = ScheduleTemplate().toTimeSlots()
     }
 }
 
@@ -146,12 +136,83 @@ enum class ThemeMode(val label: String) {
     DARK("深色")
 }
 
+/**
+ * 作息模板：按「每天几节 + 每节时长 + 课间休息」批量生成时间表。
+ *
+ * 上午 / 下午 / 晚间各自指定起始时间与节数，节与节之间按 [breakMinutes] 顺延，
+ * 三段的节次从 1 开始连续编号，跳过节数为 0 的时段。
+ */
+data class ScheduleTemplate(
+    val morningStart: String = "08:00",
+    val morningCount: Int = 4,
+    val afternoonStart: String = "14:00",
+    val afternoonCount: Int = 4,
+    val eveningStart: String = "19:00",
+    val eveningCount: Int = 4,
+    val lessonMinutes: Int = 45,
+    val breakMinutes: Int = 10
+) {
+    val totalCount: Int get() = morningCount + afternoonCount + eveningCount
+
+    fun toTimeSlots(): List<TimeSlot> {
+        val out = ArrayList<TimeSlot>(totalCount)
+        var section = 1
+
+        fun appendBlock(startText: String, count: Int) {
+            val start = TimeText.parse(startText) ?: return
+            var cursor = start
+            repeat(count.coerceAtLeast(0)) {
+                val end = cursor.plusMinutes(lessonMinutes.coerceAtLeast(1).toLong())
+                out.add(TimeSlot(section++, TimeText.format(cursor), TimeText.format(end)))
+                cursor = end.plusMinutes(breakMinutes.coerceAtLeast(0).toLong())
+            }
+        }
+
+        appendBlock(morningStart, morningCount)
+        appendBlock(afternoonStart, afternoonCount)
+        appendBlock(eveningStart, eveningCount)
+        return out
+    }
+}
+
+/** "HH:mm" 文本与 LocalTime 互转 */
+object TimeText {
+    private val PATTERN = Regex("""^(\d{1,2}):(\d{2})$""")
+
+    fun parse(text: String): java.time.LocalTime? {
+        val m = PATTERN.find(text.trim()) ?: return null
+        val h = m.groupValues[1].toIntOrNull() ?: return null
+        val min = m.groupValues[2].toIntOrNull() ?: return null
+        if (h !in 0..23 || min !in 0..59) return null
+        return java.time.LocalTime.of(h, min)
+    }
+
+    fun format(time: java.time.LocalTime): String =
+        "%02d:%02d".format(time.hour, time.minute)
+
+    fun isValid(text: String): Boolean = parse(text) != null
+
+    /** 两个时间点之间的分钟数（跨零点时按次日计算） */
+    fun minutesBetween(start: String, end: String): Int? {
+        val s = parse(start) ?: return null
+        val e = parse(end) ?: return null
+        var diff = java.time.Duration.between(s, e).toMinutes().toInt()
+        if (diff < 0) diff += 24 * 60
+        return diff
+    }
+
+    /** 在给定时间上增加分钟数 */
+    fun plus(start: String, minutes: Int): String? =
+        parse(start)?.plusMinutes(minutes.toLong())?.let { format(it) }
+}
+
 /** 应用级设置 */
 data class AppSettings(
     val termStartDate: String = "",          // ISO-8601，学期第一周的周一
     val totalWeeks: Int = 20,
     val sectionCount: Int = 12,
     val timeSlots: List<TimeSlot> = TimeSlot.default(),
+    val scheduleTemplate: ScheduleTemplate = ScheduleTemplate(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val accentIndex: Int = 0,
     val showWeekend: Boolean = true,

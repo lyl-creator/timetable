@@ -2,121 +2,175 @@ package com.lyl.timetable.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 
 // ---------------------------------------------------------------------------
-//  基础色板（OriginOS 取向：高明度、低饱和底 + 克制的中饱和前景）
+//  iOS 系统色（浅色 / 深色两套，取自 Apple Human Interface Guidelines）
 // ---------------------------------------------------------------------------
 
-val OriginBlue = Color(0xFF2E5BFF)
-val OriginBlueEnd = Color(0xFF6A4CFF)
-val OriginPurple = Color(0xFF7A4CFF)
-val OriginGreen = Color(0xFF12A37A)
-val OriginOrange = Color(0xFFFF7A38)
-val OriginPink = Color(0xFFFF5C93)
-val OriginGraphite = Color(0xFF4A4F5C)
+object SystemColors {
+    val Blue = Color(0xFF007AFF)
+    val BlueDark = Color(0xFF0A84FF)
+    val Green = Color(0xFF34C759)
+    val GreenDark = Color(0xFF30D158)
+    val Indigo = Color(0xFF5856D6)
+    val IndigoDark = Color(0xFF5E5CE6)
+    val Orange = Color(0xFFFF9500)
+    val OrangeDark = Color(0xFFFF9F0A)
+    val Pink = Color(0xFFFF2D55)
+    val PinkDark = Color(0xFFFF375F)
+    val Purple = Color(0xFFAF52DE)
+    val PurpleDark = Color(0xFFBF5AF2)
+    val Red = Color(0xFFFF3B30)
+    val RedDark = Color(0xFFFF453A)
+    val Teal = Color(0xFF5AC8FA)
+    val TealDark = Color(0xFF64D2FF)
+    val Yellow = Color(0xFFFFCC00)
+    val YellowDark = Color(0xFFFFD60A)
+    val Mint = Color(0xFF00C7BE)
+    val MintDark = Color(0xFF63E6E2)
+    val Brown = Color(0xFFA2845E)
+    val BrownDark = Color(0xFFAC8E68)
+    val Gray = Color(0xFF8E8E93)
+    val GrayDark = Color(0xFF98989D)
+}
 
-/** 强调色候选（对应 AppSettings.ACCENTS） */
-val AccentPalette: List<AccentPair> = listOf(
-    AccentPair("星海蓝", Color(0xFF2E5BFF), Color(0xFF6A4CFF)),
-    AccentPair("晨曦紫", Color(0xFF7A4CFF), Color(0xFFB44CFF)),
-    AccentPair("青竹绿", Color(0xFF12A37A), Color(0xFF3FCF9C)),
-    AccentPair("落日橙", Color(0xFFFF7A38), Color(0xFFFFB03A)),
-    AccentPair("樱粉", Color(0xFFFF5C93), Color(0xFFFF8FB8)),
-    AccentPair("午夜灰", Color(0xFF4A4F5C), Color(0xFF7B8194))
+// ---------------------------------------------------------------------------
+//  强调色（保留可切换能力，改为 iOS 系统色）
+// ---------------------------------------------------------------------------
+
+@Immutable
+data class AccentOption(val name: String, val color: Color, val darkColor: Color) {
+    fun value(isLight: Boolean): Color = if (isLight) color else darkColor
+}
+
+val AccentOptions: List<AccentOption> = listOf(
+    AccentOption("系统蓝", SystemColors.Blue, SystemColors.BlueDark),
+    AccentOption("系统紫", SystemColors.Purple, SystemColors.PurpleDark),
+    AccentOption("系统绿", SystemColors.Green, SystemColors.GreenDark),
+    AccentOption("系统橙", SystemColors.Orange, SystemColors.OrangeDark),
+    AccentOption("系统粉", SystemColors.Pink, SystemColors.PinkDark),
+    AccentOption("系统靛", SystemColors.Indigo, SystemColors.IndigoDark)
 )
 
-@Immutable
-data class AccentPair(val name: String, val start: Color, val end: Color)
-
 // ---------------------------------------------------------------------------
-//  课程卡片配色：浅色模式为浅底深字，深色模式为深底浅字
+//  课程配色：单一基色派生淡化底与强调前景，贴近 iOS 日历的观感
 // ---------------------------------------------------------------------------
 
 @Immutable
-data class CourseColorSet(
-    val lightBg: Color,
-    val lightFg: Color,
-    val darkBg: Color,
-    val darkFg: Color
-) {
-    fun background(isLight: Boolean): Color = if (isLight) lightBg else darkBg
-    fun foreground(isLight: Boolean): Color = if (isLight) lightFg else darkFg
+data class CourseColorSet(val base: Color) {
+    fun background(isLight: Boolean): Color =
+        if (isLight) lerp(base, Color.White, 0.84f) else lerp(base, Color.Black, 0.58f)
+
+    fun foreground(isLight: Boolean): Color =
+        if (isLight) lerp(base, Color.Black, 0.20f) else lerp(base, Color.White, 0.16f)
+
+    /** 用于列表左侧色条、圆点等纯色场景 */
+    fun accent(isLight: Boolean): Color =
+        if (isLight) lerp(base, Color.Black, 0.08f) else lerp(base, Color.White, 0.08f)
 }
 
 val CourseColors: List<CourseColorSet> = listOf(
-    CourseColorSet(Color(0xFFE8EDFF), Color(0xFF2A4BC0), Color(0xFF1B2350), Color(0xFFA8BCFF)), // 蓝
-    CourseColorSet(Color(0xFFEFE9FF), Color(0xFF5B3BC4), Color(0xFF241C47), Color(0xFFBFA8FF)), // 紫
-    CourseColorSet(Color(0xFFE0F4F3), Color(0xFF12766C), Color(0xFF12302F), Color(0xFF7FD8CD)), // 青
-    CourseColorSet(Color(0xFFFFEDE0), Color(0xFFB2591A), Color(0xFF3A2413), Color(0xFFFFB784)), // 橙
-    CourseColorSet(Color(0xFFFFE7EF), Color(0xFFB02F63), Color(0xFF3A1524), Color(0xFFFF9BBD)), // 粉
-    CourseColorSet(Color(0xFFE6F5E2), Color(0xFF2C7A28), Color(0xFF16301A), Color(0xFF96DA8F)), // 绿
-    CourseColorSet(Color(0xFFFFF4D6), Color(0xFF8A6410), Color(0xFF33290D), Color(0xFFF2D07A)), // 黄
-    CourseColorSet(Color(0xFFE8EEF5), Color(0xFF3F5A78), Color(0xFF1C2733), Color(0xFF9FBCD8)), // 灰蓝
-    CourseColorSet(Color(0xFFE7EAFB), Color(0xFF3A3F9E), Color(0xFF1B1E42), Color(0xFFA9AEF5)), // 靛
-    CourseColorSet(Color(0xFFFFE8E5), Color(0xFFB33A2E), Color(0xFF3A1A16), Color(0xFFFFA79B)), // 红
-    CourseColorSet(Color(0xFFE4F6EC), Color(0xFF1F7A4A), Color(0xFF13301F), Color(0xFF8ADCAF)), // 薄荷
-    CourseColorSet(Color(0xFFF2EAE3), Color(0xFF7A5238), Color(0xFF2E241D), Color(0xFFD8B79A))  // 可可
+    CourseColorSet(SystemColors.Blue),
+    CourseColorSet(SystemColors.Purple),
+    CourseColorSet(SystemColors.Pink),
+    CourseColorSet(SystemColors.Orange),
+    CourseColorSet(SystemColors.Yellow),
+    CourseColorSet(SystemColors.Green),
+    CourseColorSet(SystemColors.Teal),
+    CourseColorSet(SystemColors.Mint),
+    CourseColorSet(SystemColors.Indigo),
+    CourseColorSet(SystemColors.Red),
+    CourseColorSet(SystemColors.Brown),
+    CourseColorSet(SystemColors.Gray)
 )
 
-fun courseColor(index: Int): CourseColorSet = CourseColors[((index % CourseColors.size) + CourseColors.size) % CourseColors.size]
+fun courseColor(index: Int): CourseColorSet =
+    CourseColors[((index % CourseColors.size) + CourseColors.size) % CourseColors.size]
 
 // ---------------------------------------------------------------------------
-//  语义色板
+//  语义色板（含 Liquid Glass 材质参数）
 // ---------------------------------------------------------------------------
 
 @Immutable
-data class OriginPalette(
+data class AppPalette(
     val isLight: Boolean,
+
+    /** 页面底色：iOS systemGroupedBackground */
     val background: Color,
-    val backgroundElevated: Color,
+    /** 页面底色的次级层次 */
+    val backgroundSecondary: Color,
+
+    /** 不透明卡片（分组列表容器） */
     val card: Color,
-    val cardElevated: Color,
+    /** 卡片之上的次级填充（分段控件槽、输入框底） */
+    val fill: Color,
+
+    /** 玻璃材质：半透明底 */
+    val glass: Color,
+    /** 玻璃材质：更高不透明度（浮层、Tab Bar） */
+    val glassStrong: Color,
+    /** 玻璃边缘高光（顶部最亮） */
+    val glassHighlight: Color,
+    /** 玻璃边缘暗部 */
+    val glassEdge: Color,
+    /** 玻璃上的内容着色 */
+    val glassTint: Color,
+
     val textPrimary: Color,
     val textSecondary: Color,
     val textTertiary: Color,
-    val divider: Color,
+    val separator: Color,
     val gridLine: Color,
+
     val accent: Color,
-    val accentEnd: Color,
     val onAccent: Color,
     val danger: Color,
     val scrim: Color
 ) {
-    fun accentSoft(alpha: Float = if (isLight) 0.10f else 0.18f): Color = accent.copy(alpha = alpha)
+    fun accentSoft(alpha: Float = if (isLight) 0.12f else 0.22f): Color = accent.copy(alpha = alpha)
 }
 
-val LightPalette = OriginPalette(
+val LightPalette = AppPalette(
     isLight = true,
-    background = Color(0xFFF2F3F5),
-    backgroundElevated = Color(0xFFF7F8FA),
+    background = Color(0xFFF2F2F7),
+    backgroundSecondary = Color(0xFFEDEDF3),
     card = Color(0xFFFFFFFF),
-    cardElevated = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF131418),
-    textSecondary = Color(0xFF85868D),
-    textTertiary = Color(0xFFAEAEB6),
-    divider = Color(0xFFECEDF0),
-    gridLine = Color(0xFFE8E9ED),
-    accent = OriginBlue,
-    accentEnd = OriginBlueEnd,
+    fill = Color(0xFFE9E9EF),
+    glass = Color(0xBFFFFFFF),          // 75% 白
+    glassStrong = Color(0xDBFFFFFF),    // 86% 白
+    glassHighlight = Color(0xB3FFFFFF),
+    glassEdge = Color(0x73000000),
+    glassTint = Color(0xFF000000),
+    textPrimary = Color(0xFF000000),
+    textSecondary = Color(0x993C3C43),
+    textTertiary = Color(0x4D3C3C43),
+    separator = Color(0x493C3C43),
+    gridLine = Color(0x223C3C43),
+    accent = SystemColors.Blue,
     onAccent = Color(0xFFFFFFFF),
-    danger = Color(0xFFE0483B),
-    scrim = Color(0x66000000)
+    danger = SystemColors.Red,
+    scrim = Color(0x33000000)
 )
 
-val DarkPalette = OriginPalette(
+val DarkPalette = AppPalette(
     isLight = false,
-    background = Color(0xFF09090C),
-    backgroundElevated = Color(0xFF101116),
-    card = Color(0xFF17181D),
-    cardElevated = Color(0xFF1F2027),
-    textPrimary = Color(0xFFF4F5F7),
-    textSecondary = Color(0xFF9A9BA3),
-    textTertiary = Color(0xFF6E6F78),
-    divider = Color(0xFF26272E),
-    gridLine = Color(0xFF23242B),
-    accent = Color(0xFF6E8BFF),
-    accentEnd = Color(0xFF9A7CFF),
-    onAccent = Color(0xFF0B0B0F),
-    danger = Color(0xFFFF6B5E),
+    background = Color(0xFF000000),
+    backgroundSecondary = Color(0xFF0A0A0C),
+    card = Color(0xFF1C1C1E),
+    fill = Color(0xFF2C2C2E),
+    glass = Color(0xB31C1C1E),          // 70% 深灰
+    glassStrong = Color(0xD91C1C1E),
+    glassHighlight = Color(0x2EFFFFFF),
+    glassEdge = Color(0x14000000),
+    glassTint = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFFFFFFFF),
+    textSecondary = Color(0x99EBEBF5),
+    textTertiary = Color(0x4DEBEBF5),
+    separator = Color(0x99545458),
+    gridLine = Color(0x1FEBEBF5),
+    accent = SystemColors.BlueDark,
+    onAccent = Color(0xFFFFFFFF),
+    danger = SystemColors.RedDark,
     scrim = Color(0x99000000)
 )

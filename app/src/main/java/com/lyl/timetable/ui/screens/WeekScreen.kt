@@ -17,28 +17,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Upload
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.lyl.timetable.data.AppSettings
 import com.lyl.timetable.data.Course
-import com.lyl.timetable.ui.components.LargeTitle
+import com.lyl.timetable.ui.components.ChoiceChip
+import com.lyl.timetable.ui.components.GlassIconButton
+import com.lyl.timetable.ui.components.LargeTitleHeader
 import com.lyl.timetable.ui.components.TimetableGrid
-import com.lyl.timetable.ui.theme.OriginTheme
+import com.lyl.timetable.ui.theme.AppDimens
+import com.lyl.timetable.ui.theme.AppTheme
+import com.lyl.timetable.ui.theme.AppType
+import com.lyl.timetable.ui.theme.groupCard
 import com.lyl.timetable.ui.weekDatesOf
 import com.lyl.timetable.ui.weekSubtitle
 import java.time.LocalDate
@@ -51,11 +49,11 @@ fun WeekScreen(
     autoWeek: Int,
     onWeekChange: (Int) -> Unit,
     onCourseClick: (Course) -> Unit,
-    onEmptyAreaClick: (dayOfWeek: Int, section: Int) -> Unit,
+    onEmptyAreaClick: (Int, Int) -> Unit,
     onImport: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     val days = remember(settings.showWeekend) {
         if (settings.showWeekend) (1..7).toList() else (1..5).toList()
     }
@@ -71,26 +69,25 @@ fun WeekScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = AppDimens.ScreenPadding)
     ) {
         Spacer(Modifier.height(6.dp))
 
-        LargeTitle(
+        LargeTitleHeader(
             title = "课程表",
             subtitle = weekSubtitle(settings, week, weekCourses.map { it.name }.distinct().size)
         ) {
-            GradientIconButton(
+            GlassIconButton(
                 icon = Icons.Rounded.Upload,
                 contentDescription = "导入课表",
-                onClick = onImport,
-                background = c.card,
-                tint = c.textPrimary
+                onClick = onImport
             )
             Spacer(Modifier.width(10.dp))
-            GradientIconButton(
+            GlassIconButton(
                 icon = Icons.Rounded.Add,
                 contentDescription = "添加课程",
-                onClick = { onEmptyAreaClick(1, 1) }
+                onClick = { onEmptyAreaClick(1, 1) },
+                filled = true
             )
         }
 
@@ -103,18 +100,39 @@ fun WeekScreen(
             onSelect = onWeekChange
         )
 
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .groupCard()
+                .padding(8.dp)
+        ) {
+            TimetableGrid(
+                courses = weekCourses,
+                days = days,
+                settings = settings,
+                sectionCount = sectionCount,
+                today = if (todayInThisWeek) today else null,
+                weekDates = dates,
+                onCourseClick = onCourseClick,
+                onEmptyAreaClick = { day, section -> onEmptyAreaClick(day, section) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
         Spacer(Modifier.height(10.dp))
 
-        TimetableGrid(
-            courses = weekCourses,
-            days = days,
-            settings = settings,
-            sectionCount = sectionCount,
-            today = if (todayInThisWeek) today else null,
-            weekDates = dates,
-            onCourseClick = onCourseClick,
-            onEmptyAreaClick = onEmptyAreaClick,
-            modifier = Modifier.weight(1f)
+        Text(
+            text = if (weekCourses.isEmpty()) {
+                "本周没有课程，点击右上角添加，或导入教务导出表格"
+            } else {
+                "共 ${weekCourses.size} 个上课时段 · 点击空白格可快速添加"
+            },
+            style = AppType.Caption1,
+            color = p.textTertiary,
+            modifier = Modifier.padding(horizontal = 6.dp)
         )
 
         Spacer(Modifier.height(96.dp))
@@ -154,71 +172,20 @@ private fun WeekSelector(
 
 @Composable
 private fun WeekChip(week: Int, selected: Boolean, isCurrent: Boolean, onClick: () -> Unit) {
-    val c = OriginTheme.colors
-    Box(
-        modifier = Modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                when {
-                    selected -> Brush.linearGradient(
-                        listOf(OriginTheme.accentStart, OriginTheme.accentEnd)
-                    )
-                    else -> Brush.linearGradient(listOf(c.card, c.card))
-                }
+    val p = AppTheme.colors
+    Box(contentAlignment = Alignment.BottomCenter) {
+        ChoiceChip(
+            text = week.toString(),
+            selected = selected,
+            onClick = onClick
+        )
+        if (isCurrent && !selected) {
+            Box(
+                Modifier
+                    .padding(bottom = 4.dp)
+                    .size(4.dp)
+                    .background(p.accent, androidx.compose.foundation.shape.CircleShape)
             )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "$week",
-                style = MaterialTheme.typography.titleSmall,
-                color = if (selected) c.onAccent else c.textPrimary
-            )
-            if (isCurrent) {
-                Box(
-                    Modifier
-                        .padding(top = 1.dp)
-                        .size(4.dp)
-                        .clip(CircleShape)
-                        .background(if (selected) c.onAccent else OriginTheme.accentStart)
-                )
-            }
         }
-    }
-}
-
-@Composable
-private fun GradientIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit,
-    background: androidx.compose.ui.graphics.Color? = null,
-    tint: androidx.compose.ui.graphics.Color? = null
-) {
-    val c = OriginTheme.colors
-    val fg = tint ?: c.onAccent
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(
-                background?.let { Brush.linearGradient(listOf(it, it)) }
-                    ?: Brush.linearGradient(listOf(OriginTheme.accentStart, OriginTheme.accentEnd))
-            )
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, contentDescription = contentDescription, tint = fg, modifier = Modifier.size(20.dp))
     }
 }

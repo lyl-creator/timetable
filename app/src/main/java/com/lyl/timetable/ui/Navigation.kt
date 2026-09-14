@@ -1,6 +1,8 @@
 package com.lyl.timetable.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,25 +17,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.lyl.timetable.ui.theme.OriginTheme
+import com.lyl.timetable.ui.theme.AppDimens
+import com.lyl.timetable.ui.theme.AppTheme
+import com.lyl.timetable.ui.theme.AppType
+import com.lyl.timetable.ui.theme.liquidGlass
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     WEEK("课表", Icons.Rounded.CalendarMonth),
@@ -41,109 +42,83 @@ enum class AppTab(val label: String, val icon: ImageVector) {
     SETTINGS("设置", Icons.Rounded.Settings)
 }
 
-/** 悬浮胶囊底部导航（OriginOS 原子组件风格） */
+/**
+ * 底部玻璃 Tab Bar（iOS 26 的浮动胶囊形态）。
+ * 选中项使用强调色，图标带轻微弹性缩放。
+ */
 @Composable
-fun FloatingBottomBar(
+fun FloatingTabBar(
     current: AppTab,
     onSelect: (AppTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val c = OriginTheme.colors
-    Surface(
+    val p = AppTheme.colors
+    Row(
         modifier = modifier
-            .height(62.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(31.dp),
-        color = c.card,
-        shadowElevation = if (c.isLight) 8.dp else 0.dp,
-        border = if (c.isLight) null else androidx.compose.foundation.BorderStroke(1.dp, c.divider)
+            .height(58.dp)
+            .fillMaxWidth()
+            .liquidGlass(radius = AppDimens.Capsule, strong = true, elevation = 14.dp)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            AppTab.entries.forEach { tab ->
-                BottomBarItem(
-                    tab = tab,
-                    selected = tab == current,
-                    onClick = { onSelect(tab) }
-                )
-            }
+        AppTab.entries.forEach { tab ->
+            TabBarItem(
+                tab = tab,
+                selected = tab == current,
+                onClick = { onSelect(tab) }
+            )
         }
     }
 }
 
 @Composable
-private fun BottomBarItem(
+private fun TabBarItem(
     tab: AppTab,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val c = OriginTheme.colors
-    val scale by animateFloatAsState(if (selected) 1f else 0.94f, tween(220), label = "navScale")
+    val p = AppTheme.colors
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 600f),
+        label = "tabScale"
+    )
+    val tint by animateColorAsState(
+        targetValue = if (selected) p.accent else p.textSecondary,
+        animationSpec = tween(200),
+        label = "tabTint"
+    )
 
-    Row(
+    Column(
         modifier = Modifier
             .scale(scale)
-            .clip(RoundedCornerShape(24.dp))
-            .background(if (selected) c.accentSoft(if (c.isLight) 0.12f else 0.20f) else c.card)
+            .width(84.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = if (selected) 16.dp else 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = tab.icon,
             contentDescription = tab.label,
-            tint = if (selected) OriginTheme.accentStart else c.textTertiary,
-            modifier = Modifier.size(22.dp)
+            tint = tint,
+            modifier = Modifier.size(24.dp)
         )
-        if (selected) {
-            Spacer(Modifier.width(7.dp))
-            Text(
-                text = tab.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = OriginTheme.accentStart
-            )
-        }
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = tab.label,
+            style = AppType.Caption2,
+            color = tint
+        )
     }
 }
 
-/** 顶部状态栏占位 */
+/** 顶部状态栏占位（由外层统一处理 Insets 时可省略） */
 @Composable
 fun StatusBarSpacer(modifier: Modifier = Modifier) {
     Box(modifier.height(0.dp).width(0.dp))
-}
-
-/** 简易的分组卡片容器，用于设置页 */
-@Composable
-fun SettingsGroup(
-    title: String?,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    val c = OriginTheme.colors
-    Column(modifier) {
-        if (!title.isNullOrBlank()) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = c.textSecondary,
-                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
-            )
-        }
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            color = c.card,
-            shadowElevation = if (c.isLight) 3.dp else 0.dp,
-            border = if (c.isLight) null else androidx.compose.foundation.BorderStroke(1.dp, c.divider)
-        ) {
-            Column { content() }
-        }
-    }
 }

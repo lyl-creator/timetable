@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -41,24 +40,21 @@ import androidx.compose.ui.unit.sp
 import com.lyl.timetable.data.AppSettings
 import com.lyl.timetable.data.Course
 import com.lyl.timetable.data.TimeSlot
-import com.lyl.timetable.ui.theme.OriginTheme
+import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.courseColor
 import java.time.LocalDate
 
-private val TimeColumnWidth = 44.dp
-private val RowHeight = 58.dp
-private val HeaderHeight = 58.dp
-private val MinDayColumnWidth = 62.dp
+private val TimeColumnWidth = 42.dp
+private val RowHeight = 56.dp
+private val HeaderHeight = 56.dp
+private val MinDayColumnWidth = 60.dp
+private val ChipRadius = 10.dp
 
 /**
- * 周课表网格。
+ * 周课表网格（iOS 日历观感）。
  *
- * 结构：固定表头（星期 + 日期）/ 左侧时间列 / 内容区。
- * 横向整体滚动、纵向内容滚动；课程块按「星期 × 节次」绝对定位并支持跨节。
- *
- * 关于「每周课程不同」：调用方只需传入**当前周**生效的课程集合即可。
- * 若同一格（同星期、同节次区间）在一周内存在多条记录（例如冲突选修），
- * 会纵向等分显示，保证不互相遮挡。
+ * 表头显示星期与日期，今日以强调色标识；课程块左侧带色条、淡色底、深色文字。
+ * 横向整体滚动、纵向内容滚动，课程块按「星期 × 节次」绝对定位并支持跨节。
  */
 @Composable
 fun TimetableGrid(
@@ -75,7 +71,6 @@ fun TimetableGrid(
     val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
 
-    // 按「星期 + 节次区间」分组，用于同格多记录的纵向排布
     val grouped = remember(courses) {
         courses.groupBy { Triple(it.dayOfWeek, it.startSection, it.endSection) }
     }
@@ -93,7 +88,7 @@ fun TimetableGrid(
                 .horizontalScroll(hScroll)
                 .width(totalWidth)
         ) {
-            // ---------------- 表头（纵向固定） ----------------
+            // ---------------- 表头 ----------------
             Row(
                 modifier = Modifier.height(HeaderHeight).width(totalWidth),
                 verticalAlignment = Alignment.CenterVertically
@@ -111,7 +106,7 @@ fun TimetableGrid(
                 }
             }
 
-            // ---------------- 主体（纵向滚动） ----------------
+            // ---------------- 主体 ----------------
             Box(Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier
@@ -132,7 +127,6 @@ fun TimetableGrid(
                             todayIndex = if (today != null) weekDates.indexOf(today) else -1
                         )
 
-                        // 空白区点击 → 按位置换算星期与节次后新增
                         if (onEmptyAreaClick != null) {
                             val dayColPx = with(LocalDensity.current) { dayColWidth.toPx() }
                             val rowPx = with(LocalDensity.current) { RowHeight.toPx() }
@@ -151,7 +145,6 @@ fun TimetableGrid(
                             )
                         }
 
-                        // 课程块
                         grouped.forEach { (key, group) ->
                             val dayIndex = days.indexOf(key.first)
                             if (dayIndex < 0) return@forEach
@@ -198,24 +191,24 @@ private fun GridBackground(
     dayColWidth: Dp,
     todayIndex: Int
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     Canvas(Modifier.fillMaxSize()) {
         val colW = dayColWidth.toPx()
         val rowH = RowHeight.toPx()
         if (todayIndex >= 0) {
             drawRect(
-                color = c.accent.copy(alpha = if (c.isLight) 0.05f else 0.09f),
+                color = p.accent.copy(alpha = if (p.isLight) 0.05f else 0.10f),
                 topLeft = Offset(colW * todayIndex, 0f),
                 size = Size(colW, size.height)
             )
         }
         for (i in 0..sectionCount) {
             val y = rowH * i
-            drawLine(c.gridLine, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+            drawLine(p.gridLine, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
         }
         for (j in 0..days) {
             val x = colW * j
-            drawLine(c.gridLine, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+            drawLine(p.gridLine, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
         }
     }
 }
@@ -227,18 +220,18 @@ private fun DayHeaderCell(
     isToday: Boolean,
     width: Dp
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     Column(
         modifier = Modifier.width(width),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .height(48.dp)
-                .width(width - 8.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .height(46.dp)
+                .width(width - 10.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (isToday) OriginTheme.accentStart.copy(alpha = if (c.isLight) 0.10f else 0.20f)
+                    if (isToday) p.accentSoft(if (p.isLight) 0.12f else 0.20f)
                     else Color.Transparent
                 ),
             contentAlignment = Alignment.Center
@@ -246,17 +239,19 @@ private fun DayHeaderCell(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "周${Course.DAY_SHORT[dayOfWeek - 1]}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isToday) OriginTheme.accentStart else c.textSecondary,
-                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isToday) p.accent else p.textSecondary
                 )
                 if (date != null) {
-                    Spacer(Modifier.height(1.dp))
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = date.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isToday) OriginTheme.accentStart else c.textTertiary,
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                        fontSize = 13.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isToday) p.accent else p.textTertiary
                     )
                 }
             }
@@ -266,7 +261,7 @@ private fun DayHeaderCell(
 
 @Composable
 private fun TimeColumn(settings: AppSettings, sectionCount: Int) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     Column(Modifier.width(TimeColumnWidth)) {
         for (section in 1..sectionCount) {
             val slot: TimeSlot? = settings.timeSlotOf(section)
@@ -274,22 +269,23 @@ private fun TimeColumn(settings: AppSettings, sectionCount: Int) {
                 modifier = Modifier
                     .height(RowHeight)
                     .width(TimeColumnWidth)
-                    .padding(end = 4.dp),
+                    .padding(end = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = section.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = c.textSecondary,
-                    fontWeight = FontWeight.SemiBold
+                    text = section.toString(),
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = p.textSecondary
                 )
                 if (slot != null) {
                     Text(
                         text = slot.startTime,
                         fontSize = 9.sp,
                         lineHeight = 11.sp,
-                        color = c.textTertiary,
+                        color = p.textTertiary,
                         textAlign = TextAlign.Center,
                         maxLines = 1
                     )
@@ -299,35 +295,45 @@ private fun TimeColumn(settings: AppSettings, sectionCount: Int) {
     }
 }
 
-/** 单个课程块 */
+/** 单个课程块：左侧色条 + 淡色底 + 深色文字（iOS 日历观感） */
 @Composable
 private fun CourseChip(
     course: Course,
     compact: Boolean,
     onClick: () -> Unit
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     val palette = courseColor(course.colorIndex)
-    val bg = palette.background(c.isLight)
-    val fg = palette.foreground(c.isLight)
+    val bg = palette.background(p.isLight)
+    val fg = palette.foreground(p.isLight)
+    val bar = palette.accent(p.isLight)
 
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(ChipRadius))
             .background(bg)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 5.dp, vertical = 5.dp)
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .fillMaxSize()
+                .background(bar)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 5.dp, vertical = 4.dp)
+        ) {
             Text(
                 text = course.name,
-                fontSize = if (compact) 9.5.sp else 10.5.sp,
-                lineHeight = if (compact) 11.sp else 12.5.sp,
+                fontSize = if (compact) 10.sp else 11.sp,
+                lineHeight = if (compact) 11.5.sp else 12.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = fg,
                 maxLines = if (compact) 2 else if (course.sectionCount >= 3) 4 else 3,
@@ -339,7 +345,7 @@ private fun CourseChip(
                     text = course.location,
                     fontSize = 9.sp,
                     lineHeight = 10.5.sp,
-                    color = fg.copy(alpha = 0.72f),
+                    color = fg.copy(alpha = 0.75f),
                     maxLines = if (compact) 1 else 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -350,7 +356,7 @@ private fun CourseChip(
                     text = course.teacher,
                     fontSize = 8.5.sp,
                     lineHeight = 10.sp,
-                    color = fg.copy(alpha = 0.62f),
+                    color = fg.copy(alpha = 0.65f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

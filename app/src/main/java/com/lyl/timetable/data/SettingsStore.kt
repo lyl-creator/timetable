@@ -17,6 +17,7 @@ internal class SettingsStore(context: Context) {
             totalWeeks = prefs.getInt(KEY_TOTAL_WEEKS, 20).coerceIn(1, 31),
             sectionCount = sectionCount.coerceIn(4, 20),
             timeSlots = if (slots.isEmpty()) TimeSlot.default() else slots,
+            scheduleTemplate = decodeTemplate(prefs.getString(KEY_TEMPLATE, null)),
             themeMode = runCatching {
                 ThemeMode.valueOf(prefs.getString(KEY_THEME, ThemeMode.SYSTEM.name)!!)
             }.getOrDefault(ThemeMode.SYSTEM),
@@ -33,12 +34,37 @@ internal class SettingsStore(context: Context) {
             .putInt(KEY_TOTAL_WEEKS, settings.totalWeeks)
             .putInt(KEY_SECTION_COUNT, settings.sectionCount)
             .putString(KEY_SLOTS, encodeSlots(settings.timeSlots))
+            .putString(KEY_TEMPLATE, encodeTemplate(settings.scheduleTemplate))
             .putString(KEY_THEME, settings.themeMode.name)
             .putInt(KEY_ACCENT, settings.accentIndex)
             .putBoolean(KEY_WEEKEND, settings.showWeekend)
             .putInt(KEY_WEEK_OVERRIDE, settings.currentWeekOverride)
             .putString(KEY_STUDENT, settings.studentName)
             .apply()
+    }
+
+    private fun encodeTemplate(t: ScheduleTemplate): String = listOf(
+        t.morningStart, t.morningCount.toString(),
+        t.afternoonStart, t.afternoonCount.toString(),
+        t.eveningStart, t.eveningCount.toString(),
+        t.lessonMinutes.toString(), t.breakMinutes.toString()
+    ).joinToString("|")
+
+    private fun decodeTemplate(raw: String?): ScheduleTemplate {
+        if (raw.isNullOrBlank()) return ScheduleTemplate()
+        val f = raw.split("|")
+        if (f.size < 8) return ScheduleTemplate()
+        val fallback = ScheduleTemplate()
+        return ScheduleTemplate(
+            morningStart = f[0].takeIf { TimeText.isValid(it) } ?: fallback.morningStart,
+            morningCount = f[1].toIntOrNull()?.coerceIn(0, 12) ?: fallback.morningCount,
+            afternoonStart = f[2].takeIf { TimeText.isValid(it) } ?: fallback.afternoonStart,
+            afternoonCount = f[3].toIntOrNull()?.coerceIn(0, 12) ?: fallback.afternoonCount,
+            eveningStart = f[4].takeIf { TimeText.isValid(it) } ?: fallback.eveningStart,
+            eveningCount = f[5].toIntOrNull()?.coerceIn(0, 12) ?: fallback.eveningCount,
+            lessonMinutes = f[6].toIntOrNull()?.coerceIn(20, 180) ?: fallback.lessonMinutes,
+            breakMinutes = f[7].toIntOrNull()?.coerceIn(0, 60) ?: fallback.breakMinutes
+        )
     }
 
     private fun encodeSlots(slots: List<TimeSlot>): String =
@@ -61,6 +87,7 @@ internal class SettingsStore(context: Context) {
         const val KEY_TOTAL_WEEKS = "total_weeks"
         const val KEY_SECTION_COUNT = "section_count"
         const val KEY_SLOTS = "time_slots"
+        const val KEY_TEMPLATE = "schedule_template"
         const val KEY_THEME = "theme_mode"
         const val KEY_ACCENT = "accent_index"
         const val KEY_WEEKEND = "show_weekend"

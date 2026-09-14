@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -29,9 +27,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,24 +46,25 @@ import androidx.compose.ui.unit.dp
 import com.lyl.timetable.data.AppSettings
 import com.lyl.timetable.data.Course
 import com.lyl.timetable.data.WeekParity
-import com.lyl.timetable.ui.components.GradientButton
+import com.lyl.timetable.ui.components.ChoiceChip
+import com.lyl.timetable.ui.components.GlassTextField
+import com.lyl.timetable.ui.components.PillButton
+import com.lyl.timetable.ui.components.PillStyle
+import com.lyl.timetable.ui.components.SegmentedPicker
+import com.lyl.timetable.ui.theme.AppDimens
+import com.lyl.timetable.ui.theme.AppTheme
+import com.lyl.timetable.ui.theme.AppType
 import com.lyl.timetable.ui.theme.CourseColors
-import com.lyl.timetable.ui.theme.OriginTheme
 
 private enum class WeekEditMode(val label: String) {
     RANGE("按区间"),
-    CUSTOM("逐周勾选")
+    CUSTOM("逐周")
 }
 
 /**
- * 课程编辑抽屉。
+ * 课程编辑抽屉（iOS sheet 形态）。
  *
- * 周次支持两种编辑方式：
- *  · 按区间 —— 起止周 + 单双周（适用于绝大多数规律课程）
- *  · 逐周勾选 —— 任意周次组合（适用于每周安排不同、临时调整等情况）
- *
- * @param existing 为空表示新建
- * @param sameNameSlots 课表中已存在的同名课程时段数量，用于提示「多时段课程」
+ * 周次支持两种方式：按区间（起止周 + 单双周）与逐周勾选（任意周次组合）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +78,7 @@ fun CourseEditorSheet(
     onSave: (Course) -> Unit,
     onDelete: ((Course) -> Unit)? = null
 ) {
-    val c = OriginTheme.colors
+    val p = AppTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var name by remember { mutableStateOf(existing?.name.orEmpty()) }
@@ -99,7 +96,6 @@ fun CourseEditorSheet(
     val initialEnd = existingWeeks.lastOrNull() ?: settings.totalWeeks
     val initialParity = remember(existing) { Course.detectParity(existingWeeks) }
 
-    // 已有周次若能被「区间 + 单双周」完全还原，则默认区间模式，否则进入逐周模式
     val initiallySimple = remember(existing) {
         if (existing == null || existingWeeks.isEmpty()) true
         else Course.maskOf(initialStart, initialEnd, initialParity) == existing.weekMask
@@ -132,8 +128,8 @@ fun CourseEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = c.card,
-        scrimColor = c.scrim,
+        containerColor = p.card,
+        scrimColor = p.scrim,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
             Box(
@@ -143,9 +139,9 @@ fun CourseEditorSheet(
                 Box(
                     Modifier
                         .width(38.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(c.divider)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(2.5.dp))
+                        .background(p.separator)
                 )
             }
         }
@@ -154,7 +150,7 @@ fun CourseEditorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = AppDimens.ScreenPadding)
                 .imePadding()
                 .navigationBarsPadding()
         ) {
@@ -162,23 +158,23 @@ fun CourseEditorSheet(
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = if (existing == null) "新建课程" else "编辑课程",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = c.textPrimary
+                        style = AppType.Title2,
+                        color = p.textPrimary
                     )
                     if (existing != null && sameNameSlots > 1) {
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            text = "「${existing.name}」在课表中共有 $sameNameSlots 个时段，本页仅编辑当前这一个",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.textTertiary
+                            text = "「${existing.name}」共有 $sameNameSlots 个时段，这里只编辑当前一个",
+                            style = AppType.Footnote,
+                            color = p.textSecondary
                         )
                     }
                 }
                 Box(
                     Modifier
-                        .size(32.dp)
+                        .size(30.dp)
                         .clip(CircleShape)
-                        .background(c.cardElevated)
+                        .background(p.fill)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -186,21 +182,18 @@ fun CourseEditorSheet(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Rounded.Close, "关闭", tint = c.textSecondary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Close, "关闭", tint = p.textSecondary, modifier = Modifier.size(16.dp))
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(20.dp))
 
             FieldLabel("课程名称")
-            OutlinedTextField(
+            GlassTextField(
                 value = name,
                 onValueChange = { name = it },
-                placeholder = { Text("例如 高等数学") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth()
+                placeholder = "例如 高等数学",
+                imeAction = ImeAction.Next
             )
 
             Spacer(Modifier.height(14.dp))
@@ -208,24 +201,20 @@ fun CourseEditorSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     FieldLabel("任课教师")
-                    OutlinedTextField(
+                    GlassTextField(
                         value = teacher,
                         onValueChange = { teacher = it },
-                        placeholder = { Text("选填") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        placeholder = "选填",
+                        imeAction = ImeAction.Next
                     )
                 }
                 Column(Modifier.weight(1f)) {
                     FieldLabel("上课地点")
-                    OutlinedTextField(
+                    GlassTextField(
                         value = location,
                         onValueChange = { location = it },
-                        placeholder = { Text("选填") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        placeholder = "选填",
+                        imeAction = ImeAction.Next
                     )
                 }
             }
@@ -238,7 +227,7 @@ fun CourseEditorSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 (1..7).forEach { d ->
-                    Chip(
+                    ChoiceChip(
                         text = Course.DAY_NAMES[d - 1],
                         selected = day == d,
                         onClick = { day = d }
@@ -254,8 +243,8 @@ fun CourseEditorSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 sectionOptions.forEach { s ->
-                    Chip(
-                        text = "$s",
+                    ChoiceChip(
+                        text = s.toString(),
                         selected = s in startSection..endSection,
                         onClick = {
                             when {
@@ -269,13 +258,13 @@ fun CourseEditorSheet(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "当前：第 $startSection - $endSection 节" +
+                text = "第 $startSection – $endSection 节" +
                         settings.timeRangeText(startSection, endSection)
                             .takeIf { it.isNotBlank() }
                             ?.let { "（$it）" }
                             .orEmpty(),
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textTertiary
+                style = AppType.Footnote,
+                color = p.textSecondary
             )
 
             Spacer(Modifier.height(20.dp))
@@ -283,21 +272,22 @@ fun CourseEditorSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FieldLabel("上课周次")
                 Spacer(Modifier.weight(1f))
-                MiniSegmented(
-                    options = WeekEditMode.entries,
+                SegmentedPicker(
+                    options = WeekEditMode.entries.toList(),
                     selected = mode,
+                    onSelect = { mode = it },
                     label = { it.label },
-                    onSelect = { mode = it }
+                    modifier = Modifier.width(170.dp).height(36.dp)
                 )
             }
 
             when (mode) {
                 WeekEditMode.RANGE -> {
                     Text(
-                        text = "${weekRange.start.toInt()} - ${weekRange.endInclusive.toInt()} 周" +
+                        text = "${weekRange.start.toInt()} – ${weekRange.endInclusive.toInt()} 周" +
                                 if (parity != WeekParity.ALL) " · ${parity.label}" else "",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = OriginTheme.accentStart
+                        style = AppType.Headline,
+                        color = p.accent
                     )
                     RangeSlider(
                         value = weekRange,
@@ -306,24 +296,22 @@ fun CourseEditorSheet(
                         steps = (settings.totalWeeks - 2).coerceAtLeast(0)
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        WeekParity.entries.forEach { p ->
-                            Chip(text = p.label, selected = parity == p, onClick = { parity = p })
+                        WeekParity.entries.forEach { wp ->
+                            ChoiceChip(
+                                text = wp.label,
+                                selected = parity == wp,
+                                onClick = { parity = wp }
+                            )
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = "适用于规律课程；若每周安排不同，请切换到「逐周勾选」。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textTertiary
-                    )
                 }
 
                 WeekEditMode.CUSTOM -> {
                     Text(
                         text = "已选 ${customWeeks.size} 周" +
-                                (if (customWeeks.isEmpty()) "" else "：${customWeeks.sorted().joinToString("、")}"),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = OriginTheme.accentStart
+                                if (customWeeks.isEmpty()) "" else "：${customWeeks.sorted().joinToString("、")}",
+                        style = AppType.Headline,
+                        color = p.accent
                     )
                     Spacer(Modifier.height(10.dp))
                     WeekToggleGrid(
@@ -334,11 +322,15 @@ fun CourseEditorSheet(
                         }
                     )
                     Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SmallTextAction("全选") { customWeeks = (1..settings.totalWeeks).toSet() }
-                        SmallTextAction("清空") { customWeeks = emptySet() }
-                        SmallTextAction("仅单周") { customWeeks = (1..settings.totalWeeks).filter { it % 2 == 1 }.toSet() }
-                        SmallTextAction("仅双周") { customWeeks = (1..settings.totalWeeks).filter { it % 2 == 0 }.toSet() }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SmallAction("全选") { customWeeks = (1..settings.totalWeeks).toSet() }
+                        SmallAction("清空") { customWeeks = emptySet() }
+                        SmallAction("单周") {
+                            customWeeks = (1..settings.totalWeeks).filter { it % 2 == 1 }.toSet()
+                        }
+                        SmallAction("双周") {
+                            customWeeks = (1..settings.totalWeeks).filter { it % 2 == 0 }.toSet()
+                        }
                     }
                 }
             }
@@ -354,10 +346,10 @@ fun CourseEditorSheet(
                     val selected = colorIndex == index
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
-                            .background(set.background(c.isLight))
-                            .then(if (selected) Modifier.border(3.dp, c.textPrimary, CircleShape) else Modifier)
+                            .background(set.base)
+                            .then(if (selected) Modifier.border(2.5.dp, p.textPrimary, CircleShape) else Modifier)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
@@ -369,32 +361,26 @@ fun CourseEditorSheet(
             Spacer(Modifier.height(20.dp))
 
             FieldLabel("备注")
-            OutlinedTextField(
+            GlassTextField(
                 value = note,
                 onValueChange = { note = it },
-                placeholder = { Text("选填，如考核方式、周次说明等") },
-                shape = RoundedCornerShape(14.dp),
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
+                placeholder = "选填，如考核方式、周次说明等",
+                singleLine = false,
+                minLines = 2
             )
 
             Spacer(Modifier.height(24.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (existing != null && onDelete != null) {
-                    Box(
-                        modifier = Modifier
-                            .height(50.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(c.danger.copy(alpha = 0.10f))
-                            .clickable { showDeleteConfirm = true }
-                            .padding(horizontal = 18.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.Delete, "删除", tint = c.danger, modifier = Modifier.size(20.dp))
-                    }
+                    PillButton(
+                        text = "删除",
+                        onClick = { showDeleteConfirm = true },
+                        style = PillStyle.Destructive,
+                        icon = Icons.Rounded.Delete
+                    )
                 }
-                GradientButton(
+                PillButton(
                     text = if (existing == null) "添加到课表" else "保存修改",
                     onClick = {
                         onSave(
@@ -438,7 +424,7 @@ fun CourseEditorSheet(
                 TextButton(onClick = {
                     showDeleteConfirm = false
                     onDelete(existing)
-                }) { Text("删除", color = c.danger) }
+                }) { Text("删除", color = p.danger) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
@@ -453,21 +439,20 @@ private fun WeekToggleGrid(
     selected: Set<Int>,
     onToggle: (Int) -> Unit
 ) {
+    val p = AppTheme.colors
     val perRow = 7
     val rows = (1..totalWeeks).chunked(perRow)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { w ->
+                    val on = selected.contains(w)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(40.dp)
-                            .clip(RoundedCornerShape(13.dp))
-                            .background(
-                                if (selected.contains(w)) OriginTheme.accentStart.copy(alpha = 0.16f)
-                                else OriginTheme.colors.cardElevated
-                            )
+                            .clip(RoundedCornerShape(AppDimens.InnerRadius))
+                            .background(if (on) p.accent else p.fill)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
@@ -475,10 +460,10 @@ private fun WeekToggleGrid(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "$w",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (selected.contains(w)) OriginTheme.accentStart else OriginTheme.colors.textSecondary,
-                            fontWeight = if (selected.contains(w)) FontWeight.SemiBold else FontWeight.Normal
+                            text = w.toString(),
+                            style = AppType.Subheadline,
+                            color = if (on) p.onAccent else p.textPrimary,
+                            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal
                         )
                     }
                 }
@@ -491,61 +476,20 @@ private fun WeekToggleGrid(
 }
 
 @Composable
-private fun SmallTextAction(text: String, onClick: () -> Unit) {
+private fun SmallAction(text: String, onClick: () -> Unit) {
+    val p = AppTheme.colors
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(11.dp))
-            .background(OriginTheme.colors.cardElevated)
+            .clip(RoundedCornerShape(AppDimens.Capsule))
+            .background(p.fill)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )
-            .padding(horizontal = 12.dp, vertical = 7.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = OriginTheme.colors.textSecondary
-        )
-    }
-}
-
-@Composable
-private fun <T> MiniSegmented(
-    options: List<T>,
-    selected: T,
-    label: (T) -> String,
-    onSelect: (T) -> Unit
-) {
-    val c = OriginTheme.colors
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(c.cardElevated)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        options.forEach { option ->
-            val isSelected = option == selected
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) c.accent.copy(alpha = 0.16f) else c.cardElevated)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onSelect(option) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = label(option),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isSelected) OriginTheme.accentStart else c.textSecondary,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                )
-            }
-        }
+        Text(text = text, style = AppType.Footnote, color = p.textPrimary)
     }
 }
 
@@ -553,33 +497,8 @@ private fun <T> MiniSegmented(
 private fun FieldLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = OriginTheme.colors.textSecondary,
+        style = AppType.Footnote,
+        color = AppTheme.colors.textSecondary,
         modifier = Modifier.padding(bottom = 7.dp, start = 2.dp)
     )
-}
-
-@Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val c = OriginTheme.colors
-    Box(
-        modifier = Modifier
-            .height(38.dp)
-            .clip(RoundedCornerShape(13.dp))
-            .background(if (selected) c.accentSoft(if (c.isLight) 0.14f else 0.24f) else c.cardElevated)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
-            .padding(horizontal = 15.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) OriginTheme.accentStart else c.textSecondary,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-        )
-    }
 }
