@@ -219,4 +219,109 @@ class TimetableImporterTest {
         assertEquals(TimetableImporter.Strategy.UNKNOWN, outcome.strategy)
         assertTrue(outcome.warnings.isNotEmpty())
     }
+
+    // ---------------- 真实教务导出格式 ----------------
+
+    @Test
+    fun `方括号周次与字母楼栋可被识别`() {
+        val weeks = TimetableImporter.WeekPatterns.findAll("王鑫[4，5，7-18]周N楼-411")
+        assertNotNull(weeks)
+        requireNotNull(weeks)
+        assertEquals(listOf(4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18), weeksOf(weeks.mask))
+        assertTrue("剩余文本应保留教师名：${weeks.remaining}", weeks.remaining.contains("王鑫"))
+        assertTrue("剩余文本应保留地点：${weeks.remaining}", weeks.remaining.contains("N楼-411"))
+    }
+
+    @Test
+    fun `多段周次应合并为并集`() {
+        val weeks = TimetableImporter.WeekPatterns.findAll("周文康[10-16]周，[4，5，7-9]周")
+        assertNotNull(weeks)
+        requireNotNull(weeks)
+        assertEquals(
+            listOf(4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+            weeksOf(weeks.mask)
+        )
+    }
+
+    @Test
+    fun `真实教务矩阵课表应能完整识别`() {
+        val sheet = SheetTable(
+            "学生课表",
+            listOf(
+                listOf("2026秋季学期(2026211627)李跃龙课表", "", "", "", "", "", "", "", ""),
+                listOf("", "", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"),
+                listOf(
+                    "上午", "1-2",
+                    "通用英语B(2026版大一上)\n王鑫[4，5，7-18]周N楼-411", "",
+                    "习近平新时代中国特色社会主义思想概论\n周文康[10-16]周，[4，5，7-9]周\nG楼-101",
+                    "体育（1）(定向运动)\n张晓秋[1-5，7-17]周",
+                    "习近平新时代中国特色社会主义思想概论\n周文康[10-16]周，[4，5，7-9]周\nG楼-101",
+                    "通用英语B(2026版大一上)\n王鑫[15]周N楼-411", ""
+                ),
+                listOf(
+                    "上午", "3-4", "", "",
+                    "通用英语B(2026版大一上)\n王鑫[4，5，7-18]周N楼-411", "",
+                    "代数与几何X\n王卫卫（0602019）[15-18]周M楼-102",
+                    "通用英语B(2026版大一上)\n王鑫[16]周N楼-411", ""
+                ),
+                listOf(
+                    "下午", "5-6", "",
+                    "计算思维与人工智能\n吕晓倩[4，5，7-16]周M楼-201", "",
+                    "计算思维与人工智能\n吕晓倩[4，5，7-16]周M楼-201", "", "", ""
+                ),
+                listOf(
+                    "下午", "7-8",
+                    "代数与几何X\n王卫卫（0602019）[4，5，7-18]周M楼-104",
+                    "数学分析（1）\n于战华[18]周，[4，5，7-17]周\nM楼-405",
+                    "代数与几何X\n王卫卫（0602019）[4，5，7-18]周M楼-104",
+                    "数学分析（1）\n于战华[4，5，7-17]周M楼-405",
+                    "数学分析（1）\n于战华[4，5，7-17]周M楼-405", "", ""
+                ),
+                listOf(
+                    "晚上", "9-10", "", "",
+                    "超声：无损检测前沿探索与实践\n赵扬[4，5，7-12]周H楼-429",
+                    "职业生涯规划及就业指导\n王莹[10-17]周N楼-112", "", "", ""
+                ),
+                listOf("其它课程：四史专题◇网络◇3-16◇", "", "", "", "", "", "", "", "")
+            )
+        )
+        val outcome = TimetableImporter().analyze(Workbook(listOf(sheet)))
+
+        assertTrue("应识别成功：${outcome.warnings}", outcome.success)
+        assertEquals(TimetableImporter.Strategy.MATRIX, outcome.strategy)
+
+        val english = outcome.courses.first { it.name.startsWith("通用英语B") && it.dayOfWeek == 1 }
+        assertEquals("王鑫", english.teacher)
+        assertEquals("N楼-411", english.location)
+        assertEquals(1, english.startSection)
+        assertEquals(2, english.endSection)
+        assertEquals(
+            listOf(4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
+            english.activeWeeks
+        )
+
+        val pe = outcome.courses.first { it.name.contains("体育") }
+        assertEquals("张晓秋", pe.teacher)
+        assertEquals(4, pe.dayOfWeek)
+        assertEquals(listOf(1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17), pe.activeWeeks)
+
+        val geometry = outcome.courses.first { it.name == "代数与几何X" && it.location == "M楼-102" }
+        assertEquals("王卫卫", geometry.teacher)
+        assertEquals(listOf(15, 16, 17, 18), geometry.activeWeeks)
+
+        val ultrasonic = outcome.courses.first { it.name.contains("超声") }
+        assertEquals(9, ultrasonic.startSection)
+        assertEquals(10, ultrasonic.endSection)
+        assertEquals("H楼-429", ultrasonic.location)
+
+        val analysis = outcome.courses.first { it.name == "数学分析（1）" }
+        assertEquals("于战华", analysis.teacher)
+        assertEquals("M楼-405", analysis.location)
+
+        // 同一门课出现在两个星期时，应生成两个时段
+        assertTrue(
+            "习近平新时代中国特色社会主义思想概论应有两个时段",
+            outcome.courses.count { it.name.contains("习近平") } >= 2
+        )
+    }
 }

@@ -314,7 +314,7 @@ class TimetableImporter {
         var mask = 0
         var weekNote = ""
 
-        val weekMatch = WeekPatterns.find(work)
+        val weekMatch = WeekPatterns.findAll(work)
         if (weekMatch != null) {
             mask = weekMatch.mask
             weekNote = weekMatch.text
@@ -346,20 +346,17 @@ class TimetableImporter {
             candidates.add(cleaned)
         }
 
-        // 括号补充信息（如「高等数学(张伟)」「数据结构(1-8周)」后残留的其它标注）
-        val parens = Regex("[（(]([^（）()]{1,20})[)）]").findAll(work).map { it.groupValues[1] }.toList()
+        // 括号内的内容（如「高等数学(张伟)」中的教师）仅作为兜底来源，
+        // 因为课程名本身也可能带括号说明，例如「体育（1）(定向运动)」。
+        val parens = Regex("[（(]([^（）()]{1,20})[)）]").findAll(work)
+            .map { it.groupValues[1].trim() }
+            .toList()
 
         val ordered = LinkedHashSet(candidates).toMutableList()
         var name = if (ordered.isNotEmpty()) ordered.removeAt(0) else ""
 
+        // 先用换行 / 空白 / 标点分隔出的片段，语义更明确
         var teacher = ""
-        for (p in parens) {
-            when {
-                location.isEmpty() && looksLikeLocation(p) -> location = p
-                teacher.isEmpty() && looksLikeTeacher(p) -> teacher = p
-            }
-        }
-
         for (p in ordered) {
             when {
                 teacher.isEmpty() && looksLikeTeacher(p) -> teacher = p
@@ -369,7 +366,30 @@ class TimetableImporter {
             }
         }
 
+        // 仍有空缺时才用括号内容补齐，并把补上的部分从课程名中剥离
+        val consumed = ArrayList<String>(2)
+        for (p in parens) {
+            if (p.isEmpty()) continue
+            when {
+                location.isEmpty() && looksLikeLocation(p) -> {
+                    location = p
+                    consumed.add(p)
+                }
+
+                teacher.isEmpty() && looksLikeTeacher(p) -> {
+                    teacher = p
+                    consumed.add(p)
+                }
+            }
+        }
+        for (p in consumed) {
+            name = name.replace("($p)", " ").replace("（$p）", " ")
+        }
+        name = name.replace(Regex("\\s{2,}"), " ").trim()
+
         name = name.replace(Regex("^[\\d\\s．.、]+"), "").trim()
+        // 教师名后常带工号括号，如「王卫卫（0602019）」
+        teacher = teacher.replace(Regex("[（(]\\s*\\d{4,}\\s*[)）]"), "").trim()
         return CellContent(name, teacher, location, mask, weekNote)
     }
 
@@ -381,8 +401,8 @@ class TimetableImporter {
         // 纯字母数字房号
         if (Regex("^[A-Za-z]{1,3}[-－]?\\d{2,4}$").matches(t)) return true
         if (Regex("^[A-Za-z]{1,2}\\d{1,3}[-－]\\d{1,4}$").matches(t)) return true
-        // 「XX楼XXX」「XX区X301」「XX馆」等
-        if (Regex("^[\\u4e00-\\u9fa5]{1,6}(楼|区|馆|室|场)[A-Za-z0-9\\-－区栋号]{0,10}$").matches(t)) return true
+        // 「XX楼XXX」「X楼-101」「XX区X301」等（允许字母开头，如 N楼-411）
+        if (Regex("^[A-Za-z\\u4e00-\\u9fa5]{1,6}(楼|区|馆|室|场)[A-Za-z0-9\\-－区栋号]{0,10}$").matches(t)) return true
         // 以场馆名称结尾的短词
         if (Regex("^[\\u4e00-\\u9fa5]{1,6}(楼|馆|场|室|区|园|院|中心|教室)$").matches(t)) return true
         // 「教三301」「三教301」这类中文前缀 + 数字
@@ -493,6 +513,106 @@ class TimetableImporter {
 
         private fun consume(input: String, range: IntRange): String =
             input.replaceRange(range, " ").replace(Regex("\\s{2,}"), " ")
+
+        /** 解析单段周次文本，支持「4、5、7-18」这类数字与范围混排 */
+        private fun parseWeekList(segment: String): Int {
+            var mask = 0
+            for (piece in segment.split(Regex("[,，、;；\\s]+"))) {
+                val p = piece.trim()
+                if (p.isEmpty()) continue
+                val range = Regex("^(\\d{1,2})\\s*[-~－—至]\\s*(\\d{1,2})$").find(p)
+                if (range != null) {
+                    val a = range.groupValues[1].toIntOrNull() ?: continue
+                    val b = range.groupValues[2].toIntOrNull() ?: continue
+                    if (a in 1..31 && b in 1..31) {
+                        for (w in minOf(a, b)..maxOf(a, b)) mask = mask or (1 shl (w - 1))
+                    }
+                    continue
+                }
+                val single = Regex("^(\\d{1,2})$").find(p)?.groupValues?.get(1)?.toIntOrNull()
+                if (single != null && single in 1..31) mask = mask or (1 shl (single - 1))
+            }
+            return mask
+        }
+
+        private const val ODD_MASK = 0x55555555
+        private const val EVEN_MASK = 0xAAAAAAAA.toInt()
+
+        /**
+         * 扫描输入中的**全部**周次片段并合并。
+         *
+         * 教务系统常见的「教师[周次]周地点」写法会出现多段周次，
+         * 例如「周文康[10-16]周，[4，5，7-9]周」，需要逐段识别后取并集。
+         */
+        fun findAll(input: String): WeekResult? {
+            data class Hit(val range: IntRange, val mask: Int, val text: String)
+
+            val hits = ArrayList<Hit>(4)
+            val taken = BooleanArray(input.length)
+            fun free(range: IntRange): Boolean =
+                range.first >= 0 && range.last < input.length && range.all { !taken[it] }
+
+            fun record(range: IntRange, mask: Int, text: String) {
+                if (mask == 0 || !free(range)) return
+                hits.add(Hit(range, mask, text))
+                for (i in range) taken[i] = true
+            }
+
+            // 1) [4，5，7-18]周 —— 方括号包裹的周次列表
+            Regex("\\[\\s*([0-9\\s，,、;；\\-~－—至]+?)\\s*\\]\\s*周").findAll(input).forEach { m ->
+                record(m.range, parseWeekList(m.groupValues[1]), m.value.trim())
+            }
+
+            // 2) 1-16周 / 第1-16周 / 1-16周(单)
+            Regex("(?:第)?\\s*(\\d{1,2})\\s*[-~－—至]\\s*(\\d{1,2})\\s*周\\s*(?:[（(]\\s*(单|双)\\s*[)）])?")
+                .findAll(input).forEach { m ->
+                    val a = m.groupValues[1].toIntOrNull() ?: return@forEach
+                    val b = m.groupValues[2].toIntOrNull() ?: return@forEach
+                    if (a !in 1..31 || b !in 1..31) return@forEach
+                    val parity = when (m.groupValues[3]) {
+                        "单" -> WeekParity.ODD
+                        "双" -> WeekParity.EVEN
+                        else -> WeekParity.ALL
+                    }
+                    record(m.range, Course.maskOf(a, b, parity), m.value.trim())
+                }
+
+            // 3) 1,3,5周 这类纯列表（可带单双周标注）
+            Regex("((?:\\d{1,2}\\s*[,，、]\\s*){1,}\\d{1,2})\\s*周\\s*(?:[（(]\\s*(单|双)\\s*[)）])?")
+                .findAll(input).forEach { m ->
+                    var mask = parseWeekList(m.groupValues[1])
+                    if (mask == 0) return@forEach
+                    when (m.groupValues[2]) {
+                        "单" -> mask = mask and ODD_MASK
+                        "双" -> mask = mask and EVEN_MASK
+                    }
+                    record(m.range, mask, m.value.trim())
+                }
+
+            // 4) 单独出现的「单周 / 双周」，未给范围时按 1-20 周
+            Regex("[（(]?\\s*(单周|双周)\\s*[)）]?").findAll(input).forEach { m ->
+                val parity = if (m.groupValues[1] == "单周") WeekParity.ODD else WeekParity.EVEN
+                record(m.range, Course.maskOf(1, 20, parity), m.value.trim())
+            }
+
+            // 5) 周次：1-16 这类带前缀的写法
+            Regex("周次\\s*[:：]?\\s*([\\d\\-~，,、]+)").findAll(input).forEach { m ->
+                record(m.range, parseWeekList(m.groupValues[1]), m.value.trim())
+            }
+
+            if (hits.isEmpty()) return null
+
+            var mask = 0
+            for (h in hits) mask = mask or h.mask
+
+            // 从后往前移除命中片段，保留一个空格避免课程名与教师粘连
+            val sb = StringBuilder(input)
+            for (h in hits.sortedByDescending { it.range.first }) {
+                sb.replace(h.range.first, h.range.last + 1, " ")
+            }
+            val remaining = sb.toString().replace(Regex("\\s{2,}"), " ").trim()
+            return WeekResult(mask, hits.joinToString("，") { it.text }, remaining)
+        }
 
         fun find(input: String): WeekResult? {
             val t = input
