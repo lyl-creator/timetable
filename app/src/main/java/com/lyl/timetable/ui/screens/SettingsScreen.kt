@@ -67,6 +67,14 @@ import com.lyl.timetable.ui.theme.groupCard
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import com.lyl.timetable.BuildConfig
+import com.lyl.timetable.updater.UpdateChecker
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +89,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val p = AppTheme.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showWeeksDialog by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
@@ -259,10 +271,37 @@ fun SettingsScreen(
 
         // ---------------- 关于 ----------------
         item {
-            GroupSection(title = "关于") {
+            GroupSection(
+                title = "关于",
+                footer = "检查更新只读取 GitHub 上的版本号与下载地址，课程数据始终保存在本机。"
+            ) {
                 RowItem(title = "应用", value = "课程表")
                 RowSeparator()
-                RowItem(title = "版本", value = "1.1.0")
+                RowItem(title = "版本", value = BuildConfig.VERSION_NAME)
+                RowSeparator()
+                RowItem(
+                    title = "检查更新",
+                    value = if (checking) "正在检查…" else null,
+                    showChevron = true,
+                    trailing = {
+                        if (checking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = p.accent
+                            )
+                        }
+                    },
+                    onClick = {
+                        if (!checking) {
+                            checking = true
+                            scope.launch {
+                                updateResult = UpdateChecker.check(BuildConfig.VERSION_NAME)
+                                checking = false
+                            }
+                        }
+                    }
+                )
             }
         }
     }
@@ -355,6 +394,79 @@ fun SettingsScreen(
                 showCourseList = false
                 onEditCourse(it)
             }
+        )
+    }
+
+    // ---------------- 更新检查结果 ----------------
+    updateResult?.let { result ->
+        when (result) {
+            is UpdateChecker.Result.Available -> AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = { Text("发现新版本 ${result.info.version}") },
+                text = {
+                    Column {
+                        Text(
+                            result.info.releaseName,
+                            style = AppType.Headline,
+                            color = p.textPrimary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            result.info.notes.take(600).ifBlank { "包含若干改进与修复。" },
+                            style = AppType.Footnote,
+                            color = p.textSecondary
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "当前版本 ${BuildConfig.VERSION_NAME}",
+                            style = AppType.Caption1,
+                            color = p.textTertiary
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        openUrl(context, result.info.apkUrl ?: result.info.releaseUrl)
+                        updateResult = null
+                    }) { Text("前往下载") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { updateResult = null }) { Text("稍后") }
+                }
+            )
+
+            UpdateChecker.Result.UpToDate -> AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = { Text("已是最新版本") },
+                text = { Text("当前版本 ${BuildConfig.VERSION_NAME}，未发现更新。") },
+                confirmButton = {
+                    TextButton(onClick = { updateResult = null }) { Text("好") }
+                }
+            )
+
+            is UpdateChecker.Result.Failed -> AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = { Text("检查更新失败") },
+                text = { Text(result.message) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        openUrl(context, UpdateChecker.RELEASES_PAGE)
+                        updateResult = null
+                    }) { Text("打开 Release 页面") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { updateResult = null }) { Text("关闭") }
+                }
+            )
+        }
+    }
+}
+
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
 }

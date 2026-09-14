@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 完全离线应用：不声明任何网络权限 -->
+    <!--
+      网络权限仅用于「检查更新」：读取 GitHub Releases 的最新版本号与下载地址。
+      课程数据、课表内容全部保存在本机，应用不做任何其他网络通信。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:name=".TimetableApplication"
         android:allowBackup="true"

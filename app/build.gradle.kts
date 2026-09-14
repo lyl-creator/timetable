@@ -29,8 +29,8 @@ android {
         applicationId = "com.lyl.timetable"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         resourceConfigurations += listOf("zh", "en")
     }
 
@@ -77,6 +77,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
