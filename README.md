@@ -7,6 +7,17 @@
 
 ---
 
+## 下载安装
+
+从 [Releases](https://github.com/lyl-creator/timetable/releases) 下载最新的 `timetable-x.y.z.apk`，
+在手机上直接安装即可。
+
+- 要求 Android 8.0（API 26）及以上
+- 应用不申请任何网络权限，数据仅保存在本机
+- 文件校验值（SHA-256）见对应 Release 的说明
+
+---
+
 ## 一、主要功能
 
 | 模块 | 说明 |
