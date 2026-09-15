@@ -12,8 +12,17 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
-      上课提醒的定时：使用系统精确闹钟而非常驻服务，
-      这样应用进程被清理、任务被划掉后仍能按时收到提醒。
+      上课提醒的前台服务。通知由应用自身发出，服务以前台身份常驻，
+      因此在最近任务里划掉应用之后仍继续按课表提醒（与微信的后台表现一致）。
+      Android 14 起前台服务必须声明类型；时间表提醒不属于系统预设的任何一类，
+      故使用 specialUse，并在下方的 service 中说明具体用途。
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!--
+      精确闹钟仅作为兜底：设备进入深度休眠（Doze）时，前台服务内的计时器不会推进，
+      由闹钟把 CPU 唤醒后补投这一条提醒。两者按「已投递」去重，不会重复提醒。
       Android 12/12L 用 SCHEDULE_EXACT_ALARM（安装即授予，用户可收回）；
       Android 13 起改用 USE_EXACT_ALARM（本应用以时间表提醒为核心功能，安装即授予）。
     -->
@@ -63,7 +72,24 @@
         </activity>
 
         <!--
-          上课提醒投递：仅接受本应用闹钟的显式广播（exported=false），
+          提醒服务：通知的主体由它发出（应用自发通知，而非依赖系统定时机制）。
+          `stopWithTask="false"` 让服务在「最近任务划掉应用」后不被销毁——
+          这是「划掉后台仍能提醒」的关键；配合 START_STICKY，进程被系统回收后也会被重建。
+          `foregroundServiceType="specialUse"` 对应清单上方的权限声明。
+        -->
+        <service
+            android:name=".reminder.ReminderService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="按课表在课前发送上课提醒，不使用云端推送" />
+        </service>
+
+        <!--
+          上课提醒兜底投递：仅接受本应用闹钟的显式广播（exported=false），
           其他应用无法伪造提醒。
         -->
         <receiver

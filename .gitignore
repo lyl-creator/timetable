@@ -8,6 +8,8 @@ captures/
 *.aab
 *.ap_
 *.dex
+log
+*.log
 
 # ---- Gradle ----
 .gradle/

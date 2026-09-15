@@ -6,9 +6,13 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * 上课提醒的投递入口。
+ * 上课提醒的兜底投递入口。
  *
- * 由 [ReminderScheduler] 通过 AlarmManager 的 PendingIntent 唤醒。
+ * 正常情况由 [ReminderService] 在前台服务内计时并直接投递通知；本接收器只在
+ * 「设备深度休眠、服务内计时器不推进」时被 [ReminderScheduler] 的唤醒闹钟拉起，
+ * 负责把 CPU 唤醒后的这一条提醒补上。
+ *
+ * 两条通道共用 [ReminderDelivered] 的去重记录，因此不会重复提醒。
  * 声明为 `exported="false"`：只有系统持有时钟触发的本应用闹钟才能触发它，
  * 其他应用无法伪造提醒。
  *
@@ -19,7 +23,12 @@ class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            ReminderScheduler.ACTION_REMIND -> ReminderNotifications.show(context, intent)
+            ReminderScheduler.ACTION_REMIND -> {
+                ReminderDelivered.deliverFromIntent(context, intent)
+                // 闹钟是一次性的，投递后需要把后续提醒重新排上
+                ReminderScheduler.rescheduleFromStore(context)
+            }
+
             ReminderScheduler.ACTION_REARM -> ReminderScheduler.rescheduleFromStore(context)
         }
     }

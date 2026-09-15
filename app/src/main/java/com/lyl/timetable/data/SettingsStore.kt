@@ -30,7 +30,8 @@ internal class SettingsStore(context: Context) {
             reminderLeadMinutes = prefs.getInt(
                 KEY_REMINDER_LEAD,
                 AppSettings.DEFAULT_REMINDER_LEAD
-            )
+            ),
+            keepAliveEnabled = prefs.getBoolean(KEY_KEEP_ALIVE, true)
         )
     }
 
@@ -49,6 +50,7 @@ internal class SettingsStore(context: Context) {
             .putString(KEY_STUDENT, settings.studentName)
             .putBoolean(KEY_REMINDER_ENABLED, settings.reminderEnabled)
             .putInt(KEY_REMINDER_LEAD, settings.effectiveReminderLead)
+            .putBoolean(KEY_KEEP_ALIVE, settings.keepAliveEnabled)
             .apply()
     }
 
@@ -124,5 +126,6 @@ internal class SettingsStore(context: Context) {
         const val KEY_STUDENT = "student_name"
         const val KEY_REMINDER_ENABLED = "reminder_enabled"
         const val KEY_REMINDER_LEAD = "reminder_lead_minutes"
+        const val KEY_KEEP_ALIVE = "keep_alive_enabled"
     }
 }

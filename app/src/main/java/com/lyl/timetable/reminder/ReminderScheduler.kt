@@ -45,6 +45,7 @@ object ReminderScheduler {
     internal const val EXTRA_START_TEXT = "course_start_text"
     internal const val EXTRA_END_TEXT = "course_end_text"
     internal const val EXTRA_LEAD = "course_lead"
+    internal const val EXTRA_TRIGGER_MS = "course_trigger_ms"
 
     private const val PREFS = "timetable_reminders"
     private const val KEY_CODES = "scheduled_codes"
@@ -61,7 +62,9 @@ object ReminderScheduler {
     fun reschedule(context: Context, courses: List<Course>, settings: AppSettings) {
         val app = context.applicationContext
         cancelAll(app)
-        ReminderNotifications.ensureChannel(app)
+        ReminderNotifications.ensureChannels(app)
+        // 通知由应用自身的前台服务发出；闹钟只承担设备休眠时的唤醒职责
+        syncService(app, settings)
         if (!settings.canScheduleReminder) return
 
         val now = LocalDateTime.now()
@@ -113,6 +116,20 @@ object ReminderScheduler {
             rearmPendingIntent(app, create = false)?.let { alarmManager.cancel(it) }
         }
         saveCodes(app, emptyList())
+    }
+
+    /**
+     * 让前台服务和「提醒是否应当工作」保持一致。
+     *
+     * 服务是通知的主通道；[ReminderScheduler] 的闹钟只是设备休眠时的唤醒兜底，
+     * 因此开关状态变化时这里要同步启停服务。
+     */
+    fun syncService(context: Context, settings: AppSettings) {
+        if (settings.reminderEnabled && settings.keepAliveEnabled) {
+            ReminderService.ensureRunning(context)
+        } else {
+            ReminderService.stop(context)
+        }
     }
 
     /** 是否具备精确闹钟权限（Android 12 起为特殊权限，可能被系统收回） */
@@ -171,6 +188,8 @@ object ReminderScheduler {
             intent.putExtra(EXTRA_START_TEXT, event.startText)
             intent.putExtra(EXTRA_END_TEXT, event.endText)
             intent.putExtra(EXTRA_LEAD, event.leadMinutes)
+            // 与服务内计时器共用的去重键，避免两条通道各投递一次
+            intent.putExtra(EXTRA_TRIGGER_MS, event.triggerMillis)
         }
         val flags = if (create) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

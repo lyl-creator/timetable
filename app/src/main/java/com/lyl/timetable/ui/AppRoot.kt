@@ -59,12 +59,14 @@ fun AppRoot(
         week = repository.currentWeek()
     }
 
-    // 课程或提醒相关设置变化后重排闹钟：闹钟由系统持有，不依赖应用常驻后台
+    // 课程或提醒相关设置变化后重排提醒：
+    // 通知由应用的前台服务发出，闹钟只承担设备休眠时的唤醒职责，两者在这里一并同步
     val context = LocalContext.current.applicationContext
     LaunchedEffect(
         courses,
         settings.reminderEnabled,
         settings.reminderLeadMinutes,
+        settings.keepAliveEnabled,
         settings.termStartDate,
         settings.totalWeeks,
         settings.currentWeekOverride,

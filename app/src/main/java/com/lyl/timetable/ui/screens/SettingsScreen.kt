@@ -219,14 +219,15 @@ fun SettingsScreen(
             }
             GroupSection(
                 title = "课程提醒",
-                footer = "提醒由系统闹钟在本机触发，不依赖应用常驻后台：清理后台、划掉最近任务后仍会照常提醒，" +
+                footer = "提醒由应用后台服务在到点时直接发出，你在最近任务里划掉应用后它仍会继续工作" +
+                        "（与微信的后台表现一致），通知栏会保留一条静音的状态通知；设备深度休眠时改由系统闹钟唤醒补投，" +
                         "重启手机也会自动重排。若在系统设置里「强行停止」过本应用，需重新打开一次才能恢复。" +
                         "相邻的同一门课（如 1-2 节与 3-4 节连堂）只提醒一次。"
             ) {
                 RowItem(
                     title = "上课提醒",
                     subtitle = if (termReady) {
-                        "按课表在课前提醒，已预排未来两周"
+                        "按课表在课前提醒，不用把应用留在前台"
                     } else {
                         "需先在「学期」中设置开学第一周周一"
                     },
@@ -265,6 +266,24 @@ fun SettingsScreen(
                             color = p.textSecondary
                         )
                     }
+
+                    RowSeparator()
+                    RowItem(
+                        title = "后台保活",
+                        subtitle = if (settings.keepAliveEnabled) {
+                            "划掉最近任务后仍会提醒（通知栏有一条静音状态通知）"
+                        } else {
+                            "已关闭：仅在设备不休眠时可靠，可能漏提醒"
+                        },
+                        trailing = {
+                            AppSwitch(
+                                checked = settings.keepAliveEnabled,
+                                onCheckedChange = {
+                                    onSettingsChange(settings.copy(keepAliveEnabled = it))
+                                }
+                            )
+                        }
+                    )
 
                     if (!notificationsGranted) {
                         RowSeparator()

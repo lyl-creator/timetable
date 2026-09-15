@@ -283,7 +283,12 @@ data class AppSettings(
     /** 上课提醒开关 */
     val reminderEnabled: Boolean = false,
     /** 提前提醒的分钟数，取值见 [REMINDER_LEADS] */
-    val reminderLeadMinutes: Int = 10
+    val reminderLeadMinutes: Int = 10,
+    /**
+     * 后台保活：让提醒服务以前台服务常驻，通知由应用自身发出，
+     * 表现为「划掉最近任务后仍在运行」。关闭后仅依赖系统闹钟投递通知。
+     */
+    val keepAliveEnabled: Boolean = true
 ) {
     fun timeSlotOf(section: Int): TimeSlot? = timeSlots.firstOrNull { it.section == section }
 

@@ -50,6 +50,15 @@ data class ReminderEvent(
     /** 合并后的课时长（分钟），用于展示 */
     val durationMinutes: Int?
         get() = TimeText.minutesBetween(startText, endText)
+
+    /**
+     * 触发时刻对应的绝对毫秒。
+     *
+     * 服务内的计时器与系统闹钟是两条独立通道，可能先后触发同一条提醒；
+     * 用同一个毫秒值作为去重键，就能保证用户只看到一条通知。
+     */
+    val triggerMillis: Long
+        get() = triggerAt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 /**
