@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -94,12 +96,23 @@ fun WeekScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        WeekSelector(
-            totalWeeks = settings.totalWeeks,
-            current = week,
-            highlightWeek = if (todayInThisWeek || settings.currentWeekOverride > 0) autoWeek else -1,
-            onSelect = onWeekChange
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WeekSelector(
+                totalWeeks = settings.totalWeeks,
+                current = week,
+                highlightWeek = if (todayInThisWeek || settings.currentWeekOverride > 0) autoWeek else -1,
+                onSelect = onWeekChange,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            FilledTonalButton(
+                onClick = { onWeekChange(autoWeek) },
+                enabled = week != autoWeek,
+                contentPadding = PaddingValues(horizontal = 14.dp)
+            ) {
+                Text(text = "今天")
+            }
+        }
 
         Spacer(Modifier.height(12.dp))
 
@@ -149,7 +162,8 @@ private fun WeekSelector(
     totalWeeks: Int,
     current: Int,
     highlightWeek: Int,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(current) {
@@ -159,7 +173,7 @@ private fun WeekSelector(
     }
     LazyRow(
         state = listState,
-        modifier = Modifier.fillMaxWidth().height(40.dp),
+        modifier = modifier.height(40.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(end = 8.dp)
     ) {

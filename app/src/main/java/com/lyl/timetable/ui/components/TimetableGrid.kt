@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -32,29 +33,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lyl.timetable.data.AppSettings
 import com.lyl.timetable.data.Course
-import com.lyl.timetable.data.TimeSlot
+import com.lyl.timetable.ui.theme.AppDimens
 import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.courseColor
 import java.time.LocalDate
 
-private val TimeColumnWidth = 42.dp
+/** 左侧固定的节次列宽度（需要放得下「08:00–08:45」） */
+private val TimeColumnWidth = 60.dp
 private val RowHeight = 56.dp
 private val HeaderHeight = 56.dp
-private val MinDayColumnWidth = 60.dp
-private val ChipRadius = 10.dp
+private val MinDayColumnWidth = 58.dp
+private val ChipRadius = 12.dp
 
 /**
- * 周课表网格（iOS 日历观感）。
+ * 周课表网格。
  *
- * 表头显示星期与日期，今日以强调色标识；课程块左侧带色条、淡色底、深色文字。
- * 横向整体滚动、纵向内容滚动，课程块按「星期 × 节次」绝对定位并支持跨节。
+ * 布局要点：**左侧节次与时间列固定**，只有右侧的表头与网格可以横向滚动；
+ * 纵向滚动时两者一起滚动，因此节次与课程始终一一对应。
  */
 @Composable
 fun TimetableGrid(
@@ -68,111 +69,148 @@ fun TimetableGrid(
     modifier: Modifier = Modifier,
     onEmptyAreaClick: ((dayOfWeek: Int, section: Int) -> Unit)? = null
 ) {
-    val hScroll = rememberScrollState()
     val vScroll = rememberScrollState()
+    val hScroll = rememberScrollState()
 
     val grouped = remember(courses) {
         courses.groupBy { Triple(it.dayOfWeek, it.startSection, it.endSection) }
     }
 
     BoxWithConstraints(modifier = modifier) {
+        val available = maxWidth - TimeColumnWidth
         val dayColWidth = maxOf(
             MinDayColumnWidth,
-            ((maxWidth - TimeColumnWidth) / days.size.coerceAtLeast(1))
+            available / days.size.coerceAtLeast(1)
         )
-        val totalWidth = TimeColumnWidth + dayColWidth * days.size
+        val gridWidth = dayColWidth * days.size
         val bodyHeight = RowHeight * sectionCount
+        val todayIndex = if (today != null) weekDates.indexOf(today) else -1
+        val p = AppTheme.colors
 
-        Column(
+        Row(
             modifier = Modifier
-                .horizontalScroll(hScroll)
-                .width(totalWidth)
+                .fillMaxSize()
+                .verticalScroll(vScroll)
         ) {
-            // ---------------- 表头 ----------------
-            Row(
-                modifier = Modifier.height(HeaderHeight).width(totalWidth),
-                verticalAlignment = Alignment.CenterVertically
+            // ---------------- 左侧固定列 ----------------
+            Column(
+                modifier = Modifier
+                    .width(TimeColumnWidth)
+                    .background(p.card)
             ) {
-                Spacer(Modifier.width(TimeColumnWidth))
-                days.forEachIndexed { index, day ->
-                    val date = weekDates.getOrNull(index)
-                    val isToday = today != null && date != null && date == today
-                    DayHeaderCell(
-                        dayOfWeek = day,
-                        date = date,
-                        isToday = isToday,
-                        width = dayColWidth
-                    )
+                // 与表头对齐的占位
+                Spacer(Modifier.height(HeaderHeight))
+                for (section in 1..sectionCount) {
+                    val slot = settings.timeSlotOf(section)
+                    Column(
+                        modifier = Modifier
+                            .height(RowHeight)
+                            .width(TimeColumnWidth)
+                            .padding(end = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = section.toString(),
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = p.textSecondary
+                        )
+                        if (slot != null) {
+                            Text(
+                                text = "${slot.startTime}–${slot.endTime}",
+                                fontSize = 8.5.sp,
+                                lineHeight = 11.sp,
+                                color = p.textTertiary,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
 
-            // ---------------- 主体 ----------------
-            Box(Modifier.weight(1f)) {
+            // ---------------- 右侧：表头 + 网格（共用横向滚动） ----------------
+            Column(
+                modifier = Modifier
+                    .width(available)
+                    .horizontalScroll(hScroll)
+            ) {
                 Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(vScroll)
+                        .height(HeaderHeight)
+                        .width(gridWidth),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TimeColumn(settings = settings, sectionCount = sectionCount)
-
-                    Box(
-                        modifier = Modifier
-                            .width(dayColWidth * days.size)
-                            .height(bodyHeight)
-                    ) {
-                        GridBackground(
-                            days = days.size,
-                            sectionCount = sectionCount,
-                            dayColWidth = dayColWidth,
-                            todayIndex = if (today != null) weekDates.indexOf(today) else -1
+                    days.forEachIndexed { index, day ->
+                        val date = weekDates.getOrNull(index)
+                        val isToday = today != null && date != null && date == today
+                        DayHeaderCell(
+                            dayOfWeek = day,
+                            date = date,
+                            isToday = isToday,
+                            width = dayColWidth
                         )
+                    }
+                }
 
-                        if (onEmptyAreaClick != null) {
-                            val dayColPx = with(LocalDensity.current) { dayColWidth.toPx() }
-                            val rowPx = with(LocalDensity.current) { RowHeight.toPx() }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(days.size, sectionCount, dayColPx, rowPx) {
-                                        detectTapGestures { position ->
-                                            val dayIdx = (position.x / dayColPx).toInt()
-                                                .coerceIn(0, days.size - 1)
-                                            val secIdx = (position.y / rowPx).toInt()
-                                                .coerceIn(0, sectionCount - 1)
-                                            onEmptyAreaClick(days[dayIdx], secIdx + 1)
-                                        }
+                Box(
+                    modifier = Modifier
+                        .width(gridWidth)
+                        .height(bodyHeight)
+                ) {
+                    GridBackground(
+                        days = days.size,
+                        sectionCount = sectionCount,
+                        dayColWidth = dayColWidth,
+                        todayIndex = todayIndex
+                    )
+
+                    if (onEmptyAreaClick != null) {
+                        val dayColPx = with(LocalDensity.current) { dayColWidth.toPx() }
+                        val rowPx = with(LocalDensity.current) { RowHeight.toPx() }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(days.size, sectionCount, dayColPx, rowPx) {
+                                    detectTapGestures { position ->
+                                        val dayIdx = (position.x / dayColPx).toInt()
+                                            .coerceIn(0, days.size - 1)
+                                        val secIdx = (position.y / rowPx).toInt()
+                                            .coerceIn(0, sectionCount - 1)
+                                        onEmptyAreaClick(days[dayIdx], secIdx + 1)
                                     }
-                            )
-                        }
+                                }
+                        )
+                    }
 
-                        grouped.forEach { (key, group) ->
-                            val dayIndex = days.indexOf(key.first)
-                            if (dayIndex < 0) return@forEach
-                            val startIndex = key.second - 1
-                            if (startIndex < 0 || startIndex >= sectionCount) return@forEach
-                            val span = (key.third - key.second + 1)
-                                .coerceAtMost(sectionCount - startIndex)
-                            if (span <= 0) return@forEach
+                    grouped.forEach { (key, group) ->
+                        val dayIndex = days.indexOf(key.first)
+                        if (dayIndex < 0) return@forEach
+                        val startIndex = key.second - 1
+                        if (startIndex < 0 || startIndex >= sectionCount) return@forEach
+                        val span = (key.third - key.second + 1)
+                            .coerceAtMost(sectionCount - startIndex)
+                        if (span <= 0) return@forEach
 
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = dayColWidth * dayIndex, y = RowHeight * startIndex)
-                                    .width(dayColWidth)
-                                    .height(RowHeight * span)
-                                    .padding(2.dp)
+                        Box(
+                            modifier = Modifier
+                                .offset(x = dayColWidth * dayIndex, y = RowHeight * startIndex)
+                                .width(dayColWidth)
+                                .height(RowHeight * span)
+                                .padding(2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(1.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(1.dp)
-                                ) {
-                                    group.forEach { course ->
-                                        Box(Modifier.weight(1f)) {
-                                            CourseChip(
-                                                course = course,
-                                                compact = group.size > 1,
-                                                onClick = { onCourseClick(course) }
-                                            )
-                                        }
+                                group.forEach { course ->
+                                    Box(Modifier.weight(1f)) {
+                                        CourseChip(
+                                            course = course,
+                                            compact = group.size > 1,
+                                            onClick = { onCourseClick(course) }
+                                        )
                                     }
                                 }
                             }
@@ -197,7 +235,7 @@ private fun GridBackground(
         val rowH = RowHeight.toPx()
         if (todayIndex >= 0) {
             drawRect(
-                color = p.accent.copy(alpha = if (p.isLight) 0.05f else 0.10f),
+                color = p.accent.copy(alpha = if (p.isLight) 0.06f else 0.12f),
                 topLeft = Offset(colW * todayIndex, 0f),
                 size = Size(colW, size.height)
             )
@@ -220,82 +258,46 @@ private fun DayHeaderCell(
     isToday: Boolean,
     width: Dp
 ) {
-    val p = AppTheme.colors
-    Column(
+    val scheme = MaterialTheme.colorScheme
+    Box(
         modifier = Modifier.width(width),
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Box(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .height(46.dp)
-                .width(width - 10.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (isToday) p.accentSoft(if (p.isLight) 0.12f else 0.20f)
-                    else Color.Transparent
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "周${Course.DAY_SHORT[dayOfWeek - 1]}",
-                    fontSize = 11.sp,
-                    lineHeight = 13.sp,
-                    fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isToday) p.accent else p.textSecondary
+                .clip(RoundedCornerShape(AppDimens.InnerRadius))
+                .then(
+                    if (isToday) {
+                        Modifier.background(scheme.primaryContainer)
+                    } else {
+                        Modifier
+                    }
                 )
-                if (date != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = date.dayOfMonth.toString(),
-                        fontSize = 13.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isToday) p.accent else p.textTertiary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimeColumn(settings: AppSettings, sectionCount: Int) {
-    val p = AppTheme.colors
-    Column(Modifier.width(TimeColumnWidth)) {
-        for (section in 1..sectionCount) {
-            val slot: TimeSlot? = settings.timeSlotOf(section)
-            Column(
-                modifier = Modifier
-                    .height(RowHeight)
-                    .width(TimeColumnWidth)
-                    .padding(end = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = Course.DAY_SHORT[dayOfWeek - 1],
+                fontSize = 12.sp,
+                lineHeight = 14.sp,
+                fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isToday) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+            )
+            if (date != null) {
+                Spacer(Modifier.height(2.dp))
                 Text(
-                    text = section.toString(),
+                    text = date.dayOfMonth.toString(),
                     fontSize = 12.sp,
                     lineHeight = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = p.textSecondary
+                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isToday) scheme.onPrimaryContainer else scheme.outline
                 )
-                if (slot != null) {
-                    Text(
-                        text = slot.startTime,
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
-                        color = p.textTertiary,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
-                }
             }
         }
     }
 }
 
-/** 单个课程块：左侧色条 + 淡色底 + 深色文字（iOS 日历观感） */
+/** 单个课程块：左侧色条 + tonal 底色 + 深色文字 */
 @Composable
 private fun CourseChip(
     course: Course,
@@ -321,14 +323,14 @@ private fun CourseChip(
     ) {
         Box(
             Modifier
-                .width(3.dp)
+                .width(4.dp)
                 .fillMaxSize()
                 .background(bar)
         )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 5.dp, vertical = 4.dp)
+                .padding(horizontal = 6.dp, vertical = 5.dp)
         ) {
             Text(
                 text = course.name,

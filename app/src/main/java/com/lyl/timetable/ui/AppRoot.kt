@@ -1,5 +1,6 @@
 package com.lyl.timetable.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,20 @@ fun AppRoot(
     }
 
     val autoWeek = repository.currentWeek()
+
+    // 返回手势与返回键：先退出二级页面，其次回到课表页，最后才退出应用
+    BackHandler(enabled = showImport || showSchedule || tab != AppTab.WEEK) {
+        when {
+            showImport -> {
+                showImport = false
+                importUri = null
+            }
+
+            showSchedule -> showSchedule = false
+
+            else -> tab = AppTab.WEEK
+        }
+    }
 
     AppTheme(
         themeMode = settings.themeMode,
@@ -119,7 +134,9 @@ fun AppRoot(
                             AppTab.TODAY -> TodayScreen(
                                 courses = courses,
                                 settings = settings,
-                                week = week,
+                                // 今日页固定显示「今天所在周」的课程，
+                                // 不受课表页当前选中的周次影响
+                                week = autoWeek,
                                 onCourseClick = { editorRequest = EditorRequest(it) },
                                 onAddCourse = { editorRequest = EditorRequest(null) }
                             )

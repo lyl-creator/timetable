@@ -103,8 +103,9 @@ fun ScheduleEditorScreen(
             // ---------------- 每天节数 ----------------
             item {
                 GroupSection(
-                    title = "每天节数",
-                    footer = "合计 ${template.totalCount} 节。设为 0 即不排该时段。"
+                    title = "作息参数",
+                    footer = "合计 ${template.totalCount} 节；设为 0 即不排该时段。" +
+                            "单节时长与课间是生成时间表时使用的默认值，个别节次可在下方「当前作息」中单独调整。"
                 ) {
                     RowItem(
                         title = "上午",
@@ -141,17 +142,9 @@ fun ScheduleEditorScreen(
                             )
                         }
                     )
-                }
-            }
-
-            // ---------------- 单节时长 ----------------
-            item {
-                GroupSection(
-                    title = "单节与课间",
-                    footer = "课间休息指前一节结束到后一节开始的间隔。"
-                ) {
+                    RowSeparator()
                     RowItem(
-                        title = "每节课时长",
+                        title = "默认单节时长",
                         value = "${template.lessonMinutes} 分钟",
                         trailing = {
                             Stepper(
@@ -164,14 +157,15 @@ fun ScheduleEditorScreen(
                     )
                     RowSeparator()
                     RowItem(
-                        title = "课间休息",
+                        title = "默认课间",
                         value = "${template.breakMinutes} 分钟",
                         trailing = {
                             Stepper(
                                 value = template.breakMinutes,
                                 onValueChange = { v -> updateTemplate { it.copy(breakMinutes = v) } },
                                 range = 0..60,
-                                step = 5
+                                step = 5,
+                                label = "默认课间时长"
                             )
                         }
                     )
