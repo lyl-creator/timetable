@@ -8,6 +8,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- 上课提醒：通知权限（Android 13 起需用户授予） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      上课提醒的定时：使用系统精确闹钟而非常驻服务，
+      这样应用进程被清理、任务被划掉后仍能按时收到提醒。
+      Android 12/12L 用 SCHEDULE_EXACT_ALARM（安装即授予，用户可收回）；
+      Android 13 起改用 USE_EXACT_ALARM（本应用以时间表提醒为核心功能，安装即授予）。
+    -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- 重启、改时间/时区后需要重新排布闹钟 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 用于引导用户把本应用加入电池优化白名单，提高国产 ROM 上的后台存活率 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:name=".TimetableApplication"
         android:allowBackup="true"
@@ -41,6 +61,29 @@
                 <data android:scheme="file" android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
             </intent-filter>
         </activity>
+
+        <!--
+          上课提醒投递：仅接受本应用闹钟的显式广播（exported=false），
+          其他应用无法伪造提醒。
+        -->
+        <receiver
+            android:name=".reminder.ReminderReceiver"
+            android:exported="false" />
+
+        <!--
+          系统事件（开机、改时间、改时区、应用升级、每日重排）→ 重新排布闹钟。
+          过滤的都是受保护广播，只能由系统发出。
+        -->
+        <receiver
+            android:name=".reminder.SystemEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

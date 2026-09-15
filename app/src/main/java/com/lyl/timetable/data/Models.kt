@@ -279,7 +279,11 @@ data class AppSettings(
     val useDynamicColor: Boolean = true,
     val showWeekend: Boolean = true,
     val currentWeekOverride: Int = 0,        // 0 表示按开学日期自动计算
-    val studentName: String = ""
+    val studentName: String = "",
+    /** 上课提醒开关 */
+    val reminderEnabled: Boolean = false,
+    /** 提前提醒的分钟数，取值见 [REMINDER_LEADS] */
+    val reminderLeadMinutes: Int = 10
 ) {
     fun timeSlotOf(section: Int): TimeSlot? = timeSlots.firstOrNull { it.section == section }
 
@@ -289,7 +293,20 @@ data class AppSettings(
         return "$s - $e"
     }
 
+    /** 是否具备生成提醒所需的最小条件（需要开学日期才能把周次换成具体日期） */
+    val canScheduleReminder: Boolean
+        get() = reminderEnabled && termStartDate.isNotBlank()
+
+    /** 上课提醒的提前分钟数（收敛到可选值，防止旧数据越界） */
+    val effectiveReminderLead: Int
+        get() = REMINDER_LEADS.minByOrNull { kotlin.math.abs(it - reminderLeadMinutes) }
+            ?: DEFAULT_REMINDER_LEAD
+
     companion object {
         val ACCENTS = listOf("星海蓝", "晨曦紫", "青竹绿", "落日橙", "樱粉", "午夜灰")
+
+        /** 可选的提前时间（分钟） */
+        val REMINDER_LEADS = listOf(5, 10, 15, 30)
+        const val DEFAULT_REMINDER_LEAD = 10
     }
 }

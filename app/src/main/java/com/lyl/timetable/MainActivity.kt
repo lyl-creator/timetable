@@ -20,9 +20,14 @@ class MainActivity : ComponentActivity() {
         val incomingUri = intent?.let { intent ->
             if (intent.action == Intent.ACTION_VIEW) intent.data?.toString() else null
         }
+        val openToday = intent?.getBooleanExtra(EXTRA_OPEN_TODAY, false) == true
 
         setContent {
-            AppRoot(repository = repository, incomingUri = incomingUri)
+            AppRoot(
+                repository = repository,
+                incomingUri = incomingUri,
+                openToday = openToday
+            )
         }
     }
 
@@ -30,5 +35,10 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         // 再次以「用课程表打开」方式启动时，交由 Activity 重建流程处理
         setIntent(intent)
+    }
+
+    companion object {
+        /** 点击提醒通知进入应用时直接落到「今日」页 */
+        const val EXTRA_OPEN_TODAY = "open_today"
     }
 }

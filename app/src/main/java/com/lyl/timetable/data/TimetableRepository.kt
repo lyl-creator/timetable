@@ -1,7 +1,6 @@
 package com.lyl.timetable.data
 
 import android.content.Context
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,16 +107,12 @@ class TimetableRepository(context: Context) {
     fun maxUsedSection(): Int = _courses.value.maxOfOrNull { it.endSection } ?: 0
 
     companion object {
-        val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
+        val ISO_DATE = TermDates.ISO_DATE
 
-        fun parseDate(text: String?): LocalDate? {
-            if (text.isNullOrBlank()) return null
-            if (!ISO_DATE.matches(text)) return null
-            return runCatching { LocalDate.parse(text) }.getOrNull()
-        }
+        /** 解析 ISO 日期文本，非法或为空时返回 null */
+        fun parseDate(text: String?): LocalDate? = TermDates.parse(text)
 
         /** 把任意日期归一到所在周的周一（ISO 周，周一为一周之始） */
-        fun mondayOf(date: LocalDate): LocalDate =
-            date.minusDays((date.dayOfWeek.value - DayOfWeek.MONDAY.value).toLong())
+        fun mondayOf(date: LocalDate): LocalDate = TermDates.mondayOf(date)
     }
 }

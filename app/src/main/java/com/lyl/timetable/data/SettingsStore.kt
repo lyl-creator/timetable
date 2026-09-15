@@ -25,7 +25,12 @@ internal class SettingsStore(context: Context) {
             useDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
             showWeekend = prefs.getBoolean(KEY_WEEKEND, true),
             currentWeekOverride = prefs.getInt(KEY_WEEK_OVERRIDE, 0),
-            studentName = prefs.getString(KEY_STUDENT, "").orEmpty()
+            studentName = prefs.getString(KEY_STUDENT, "").orEmpty(),
+            reminderEnabled = prefs.getBoolean(KEY_REMINDER_ENABLED, false),
+            reminderLeadMinutes = prefs.getInt(
+                KEY_REMINDER_LEAD,
+                AppSettings.DEFAULT_REMINDER_LEAD
+            )
         )
     }
 
@@ -42,6 +47,8 @@ internal class SettingsStore(context: Context) {
             .putBoolean(KEY_WEEKEND, settings.showWeekend)
             .putInt(KEY_WEEK_OVERRIDE, settings.currentWeekOverride)
             .putString(KEY_STUDENT, settings.studentName)
+            .putBoolean(KEY_REMINDER_ENABLED, settings.reminderEnabled)
+            .putInt(KEY_REMINDER_LEAD, settings.effectiveReminderLead)
             .apply()
     }
 
@@ -115,5 +122,7 @@ internal class SettingsStore(context: Context) {
         const val KEY_WEEKEND = "show_weekend"
         const val KEY_WEEK_OVERRIDE = "week_override"
         const val KEY_STUDENT = "student_name"
+        const val KEY_REMINDER_ENABLED = "reminder_enabled"
+        const val KEY_REMINDER_LEAD = "reminder_lead_minutes"
     }
 }

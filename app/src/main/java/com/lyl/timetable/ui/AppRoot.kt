@@ -8,15 +8,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.lyl.timetable.data.Course
 import com.lyl.timetable.data.TimetableRepository
+import com.lyl.timetable.reminder.ReminderScheduler
 import com.lyl.timetable.ui.screens.CourseEditorSheet
 import com.lyl.timetable.ui.screens.ImportScreen
 import com.lyl.timetable.ui.screens.ScheduleEditorScreen
@@ -34,12 +41,13 @@ private data class EditorRequest(
 @Composable
 fun AppRoot(
     repository: TimetableRepository,
-    incomingUri: String? = null
+    incomingUri: String? = null,
+    openToday: Boolean = false
 ) {
     val settings by repository.settings.collectAsState()
     val courses by repository.courses.collectAsState()
 
-    var tab by remember { mutableStateOf(AppTab.WEEK) }
+    var tab by remember { mutableStateOf(if (openToday) AppTab.TODAY else AppTab.WEEK) }
     var week by remember { mutableStateOf(repository.currentWeek()) }
     var showImport by remember { mutableStateOf(incomingUri != null) }
     var importUri by remember { mutableStateOf(incomingUri) }
@@ -49,6 +57,36 @@ fun AppRoot(
     // 学期起始日期或手动指定周次变化后，重新对齐当前周
     LaunchedEffect(settings.termStartDate, settings.currentWeekOverride) {
         week = repository.currentWeek()
+    }
+
+    // 课程或提醒相关设置变化后重排闹钟：闹钟由系统持有，不依赖应用常驻后台
+    val context = LocalContext.current.applicationContext
+    LaunchedEffect(
+        courses,
+        settings.reminderEnabled,
+        settings.reminderLeadMinutes,
+        settings.termStartDate,
+        settings.totalWeeks,
+        settings.currentWeekOverride,
+        settings.sectionCount,
+        settings.timeSlots
+    ) {
+        ReminderScheduler.reschedule(context, courses, settings)
+    }
+
+    // 每次回到前台再排一次：用户在系统设置里补授了通知 / 精确闹钟权限，
+    // 或此前「强行停止」过应用导致闹钟被撤销，都能就此恢复
+    val currentCourses by rememberUpdatedState(courses)
+    val currentSettings by rememberUpdatedState(settings)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                ReminderScheduler.reschedule(context, currentCourses, currentSettings)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val autoWeek = repository.currentWeek()

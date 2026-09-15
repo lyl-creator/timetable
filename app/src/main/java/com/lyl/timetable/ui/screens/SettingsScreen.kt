@@ -1,5 +1,6 @@
 package com.lyl.timetable.ui.screens
 
+import android.Manifest
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,10 +72,19 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.lyl.timetable.BuildConfig
+import com.lyl.timetable.data.TimeText
+import com.lyl.timetable.reminder.ReminderPermissions
+import com.lyl.timetable.reminder.ReminderPlanner
 import com.lyl.timetable.updater.UpdateChecker
 import kotlinx.coroutines.launch
 
@@ -98,6 +108,30 @@ fun SettingsScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showCourseList by remember { mutableStateOf(false) }
+
+    // 授权状态在每次回到前台时重新读取：用户可能刚在系统设置里补授了权限
+    var permissionTick by remember { mutableStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) permissionTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val notificationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { permissionTick++ }
+
+    val notificationsGranted = remember(permissionTick, context) {
+        ReminderPermissions.notificationsGranted(context)
+    }
+    val exactAlarmAllowed = remember(permissionTick, context) {
+        ReminderPermissions.exactAlarmAllowed(context)
+    }
+    val batteryRestricted = remember(permissionTick, context) {
+        ReminderPermissions.batteryRestricted(context)
+    }
 
     val courseNames = remember(courses) { courses.map { it.name }.distinct() }
     val scheduleSummary = remember(settings) {
@@ -168,6 +202,108 @@ fun SettingsScreen(
                     showChevron = true,
                     onClick = onOpenSchedule
                 )
+            }
+        }
+
+        // ---------------- 课程提醒 ----------------
+        item {
+            val lead = settings.effectiveReminderLead
+            val termReady = settings.termStartDate.isNotBlank()
+            val upcomingToday = remember(courses, settings, permissionTick) {
+                if (!settings.canScheduleReminder) {
+                    emptyList()
+                } else {
+                    ReminderPlanner.previewForToday(courses, settings, LocalDate.now())
+                        .filter { it.triggerAt.isAfter(java.time.LocalDateTime.now()) }
+                }
+            }
+            GroupSection(
+                title = "课程提醒",
+                footer = "提醒由系统闹钟在本机触发，不依赖应用常驻后台：清理后台、划掉最近任务后仍会照常提醒，" +
+                        "重启手机也会自动重排。若在系统设置里「强行停止」过本应用，需重新打开一次才能恢复。" +
+                        "相邻的同一门课（如 1-2 节与 3-4 节连堂）只提醒一次。"
+            ) {
+                RowItem(
+                    title = "上课提醒",
+                    subtitle = if (termReady) {
+                        "按课表在课前提醒，已预排未来两周"
+                    } else {
+                        "需先在「学期」中设置开学第一周周一"
+                    },
+                    trailing = {
+                        AppSwitch(
+                            checked = settings.reminderEnabled,
+                            onCheckedChange = { onSettingsChange(settings.copy(reminderEnabled = it)) }
+                        )
+                    }
+                )
+                if (settings.reminderEnabled) {
+                    RowSeparator()
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text("提前时间", style = AppType.Body, color = p.textPrimary)
+                        Spacer(Modifier.height(10.dp))
+                        SegmentedPicker(
+                            options = AppSettings.REMINDER_LEADS,
+                            selected = lead,
+                            onSelect = { onSettingsChange(settings.copy(reminderLeadMinutes = it)) },
+                            label = { "$it 分钟" },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = when {
+                                !termReady -> "设置开学日期后即可自动排布提醒"
+                                upcomingToday.isEmpty() -> "今天已无待提醒的课程"
+                                else -> {
+                                    val first = upcomingToday.first()
+                                    "今天还有 ${upcomingToday.size} 次提醒 · " +
+                                            "最近一次 ${TimeText.format(first.triggerAt.toLocalTime())} " +
+                                            first.courseName
+                                }
+                            },
+                            style = AppType.Caption1,
+                            color = p.textSecondary
+                        )
+                    }
+
+                    if (!notificationsGranted) {
+                        RowSeparator()
+                        RowItem(
+                            title = "允许发送通知",
+                            subtitle = "系统未授权，到点也不会有任何提示",
+                            showChevron = true,
+                            onClick = {
+                                if (ReminderPermissions.needsNotificationRequest()) {
+                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    launchSettings(context, ReminderPermissions.notificationSettingsIntent(context))
+                                }
+                            }
+                        )
+                    }
+                    if (!exactAlarmAllowed) {
+                        RowSeparator()
+                        RowItem(
+                            title = "允许精确提醒",
+                            subtitle = "未授权时可能晚几分钟，但仍会提醒",
+                            showChevron = true,
+                            onClick = {
+                                launchSettings(context, ReminderPermissions.exactAlarmSettingsIntent(context))
+                            }
+                        )
+                    }
+                    if (batteryRestricted) {
+                        RowSeparator()
+                        RowItem(
+                            title = "关闭电池优化",
+                            subtitle = "加入白名单可避免后台被系统限制",
+                            showChevron = true,
+                            onClick = {
+                                launchSettings(context, ReminderPermissions.batteryOptimizationIntent(context))
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -460,6 +596,13 @@ private fun openUrl(context: android.content.Context, url: String) {
             Intent(Intent.ACTION_VIEW, Uri.parse(url))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
+    }
+}
+
+/** 打开系统设置页面（授权引导）；个别 ROM 缺少对应入口时静默忽略 */
+private fun launchSettings(context: android.content.Context, intent: Intent) {
+    runCatching {
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 
