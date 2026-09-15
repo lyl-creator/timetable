@@ -388,12 +388,23 @@ fun SettingsScreen(
                 }
                 RowSeparator()
                 RowItem(
-                    title = "显示周末",
-                    subtitle = "关闭后课表仅显示周一至周五",
+                    title = "显示周六",
+                    subtitle = "关闭后课表不显示周六",
                     trailing = {
                         AppSwitch(
-                            checked = settings.showWeekend,
-                            onCheckedChange = { onSettingsChange(settings.copy(showWeekend = it)) }
+                            checked = settings.showSaturday,
+                            onCheckedChange = { onSettingsChange(settings.copy(showSaturday = it)) }
+                        )
+                    }
+                )
+                RowSeparator()
+                RowItem(
+                    title = "显示周日",
+                    subtitle = "关闭后课表不显示周日",
+                    trailing = {
+                        AppSwitch(
+                            checked = settings.showSunday,
+                            onCheckedChange = { onSettingsChange(settings.copy(showSunday = it)) }
                         )
                     }
                 )

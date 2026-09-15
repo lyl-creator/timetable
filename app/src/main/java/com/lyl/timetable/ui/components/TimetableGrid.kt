@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,18 +45,34 @@ import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.courseColor
 import java.time.LocalDate
 
-/** 左侧固定的节次列宽度（需要放得下「08:00–08:45」） */
-private val TimeColumnWidth = 60.dp
+/**
+ * 左侧固定的节次列宽度。
+ *
+ * 节次下方把起始、结束时间分两行显示，时间用与节次相当的字号，
+ * 因此这一列仍可做得较窄，横向空间尽量留给课程。
+ */
+private val TimeColumnWidth = 46.dp
 private val RowHeight = 56.dp
 private val HeaderHeight = 56.dp
-private val MinDayColumnWidth = 58.dp
+
+/**
+ * 一天的最小列宽。
+ *
+ * 课表横向不压缩内容：屏幕放得下就等分铺满，放不下则保持这个宽度并改为左右滑动，
+ * 这样课程名与地点始终能完整显示，而不是被挤成省略号。
+ */
+private val MinDayColumnWidth = 72.dp
 private val ChipRadius = 12.dp
 
 /**
  * 周课表网格。
  *
- * 布局要点：**左侧节次与时间列固定**，只有右侧的表头与网格可以横向滚动；
- * 纵向滚动时两者一起滚动，因此节次与课程始终一一对应。
+ * 布局要点：
+ * - **左侧节次与时间列固定**：节次下方分两行显示起始与结束时间，故该列较窄，
+ *   横向空间尽量留给课程；
+ * - **只有表头与网格横向滑动**（纵向滚动时左侧列一起滚动，节次与课程始终一一对应）；
+ * - 每列宽度以「内容完整显示」为准，屏幕放不下时通过**左右滑动查看其它星期**，
+ *   而不是把各列压窄导致文字被截断。
  */
 @Composable
 fun TimetableGrid(
@@ -67,13 +84,20 @@ fun TimetableGrid(
     weekDates: List<LocalDate?>,
     onCourseClick: (Course) -> Unit,
     modifier: Modifier = Modifier,
-    onEmptyAreaClick: ((dayOfWeek: Int, section: Int) -> Unit)? = null
+    onEmptyAreaClick: ((dayOfWeek: Int, section: Int) -> Unit)? = null,
+    /** 网格宽度超出可视区域（需要左右滑动才能看全星期）时回调，供界面给出滑动提示 */
+    onHorizontalOverflowChange: ((Boolean) -> Unit)? = null
 ) {
     val vScroll = rememberScrollState()
     val hScroll = rememberScrollState()
 
     val grouped = remember(courses) {
         courses.groupBy { Triple(it.dayOfWeek, it.startSection, it.endSection) }
+    }
+
+    // 左上角与表头对齐的单元格：用当月月名补位，避免出现一块空白
+    val cornerLabel = remember(weekDates) {
+        weekDates.firstOrNull { it != null }?.let { "${it.monthValue}月" } ?: ""
     }
 
     BoxWithConstraints(modifier = modifier) {
@@ -87,6 +111,10 @@ fun TimetableGrid(
         val todayIndex = if (today != null) weekDates.indexOf(today) else -1
         val p = AppTheme.colors
 
+        // 内容放不下时改为横向滑动，这里把状态回传给界面以便提示「左右滑动看其它星期」
+        val overflows = gridWidth > available
+        LaunchedEffect(overflows) { onHorizontalOverflowChange?.invoke(overflows) }
+
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -98,8 +126,25 @@ fun TimetableGrid(
                     .width(TimeColumnWidth)
                     .background(p.card)
             ) {
-                // 与表头对齐的占位
-                Spacer(Modifier.height(HeaderHeight))
+                // 与表头对齐：显示当月月份，与右侧星期行形成一组
+                Box(
+                    modifier = Modifier
+                        .height(HeaderHeight)
+                        .width(TimeColumnWidth)
+                        .padding(end = 6.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    if (cornerLabel.isNotEmpty()) {
+                        Text(
+                            text = cornerLabel,
+                            fontSize = 13.sp,
+                            lineHeight = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = p.textSecondary,
+                            maxLines = 1
+                        )
+                    }
+                }
                 for (section in 1..sectionCount) {
                     val slot = settings.timeSlotOf(section)
                     Column(
@@ -112,16 +157,25 @@ fun TimetableGrid(
                     ) {
                         Text(
                             text = section.toString(),
-                            fontSize = 12.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            lineHeight = 15.sp,
+                            fontWeight = FontWeight.Medium,
                             color = p.textSecondary
                         )
                         if (slot != null) {
+                            // 起始时间与结束时间各占一行
+                            Spacer(Modifier.height(1.dp))
                             Text(
-                                text = "${slot.startTime}–${slot.endTime}",
-                                fontSize = 8.5.sp,
-                                lineHeight = 11.sp,
+                                text = slot.startTime,
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp,
+                                color = p.textTertiary,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = slot.endTime,
+                                fontSize = 10.sp,
+                                lineHeight = 12.sp,
                                 color = p.textTertiary,
                                 maxLines = 1
                             )

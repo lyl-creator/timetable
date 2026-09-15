@@ -277,7 +277,10 @@ data class AppSettings(
     val accentIndex: Int = 0,
     /** Android 12 及以上使用系统动态取色（Material You） */
     val useDynamicColor: Boolean = true,
-    val showWeekend: Boolean = true,
+    /** 课表是否显示周六 */
+    val showSaturday: Boolean = true,
+    /** 课表是否显示周日 */
+    val showSunday: Boolean = true,
     val currentWeekOverride: Int = 0,        // 0 表示按开学日期自动计算
     val studentName: String = "",
     /** 上课提醒开关 */
@@ -291,6 +294,20 @@ data class AppSettings(
     val keepAliveEnabled: Boolean = true
 ) {
     fun timeSlotOf(section: Int): TimeSlot? = timeSlots.firstOrNull { it.section == section }
+
+    /**
+     * 课表实际显示的星期（1 = 周一 … 7 = 周日），升序。
+     *
+     * 周一至周五始终显示，周六与周日各自独立开关。调用方必须按这份列表的顺序
+     * 取对应日期，不能再用「序号 = 星期 - 1」去索引整周日期，否则只隐藏周六时
+     * 会出现日期与星期错位。
+     */
+    val visibleDays: List<Int>
+        get() = buildList {
+            addAll(1..5)
+            if (showSaturday) add(6)
+            if (showSunday) add(7)
+        }
 
     fun timeRangeText(startSection: Int, endSection: Int): String {
         val s = timeSlotOf(startSection)?.startTime ?: return ""

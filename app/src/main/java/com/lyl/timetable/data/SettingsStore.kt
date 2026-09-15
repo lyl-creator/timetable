@@ -12,6 +12,9 @@ internal class SettingsStore(context: Context) {
     fun load(): AppSettings {
         val slots = decodeSlots(prefs.getString(KEY_SLOTS, null))
         val sectionCount = prefs.getInt(KEY_SECTION_COUNT, slots.size.coerceAtLeast(12))
+        // 1.8.0 及更早版本只有一个「显示周末」总开关；升级后用它作为两个新开关的初始值，
+        // 这样此前关掉周末的用户不会在升级后突然多出两天
+        val legacyShowWeekend = prefs.getBoolean(KEY_WEEKEND, true)
         return AppSettings(
             termStartDate = prefs.getString(KEY_TERM_START, "").orEmpty(),
             totalWeeks = prefs.getInt(KEY_TOTAL_WEEKS, 20).coerceIn(1, 31),
@@ -23,7 +26,8 @@ internal class SettingsStore(context: Context) {
             }.getOrDefault(ThemeMode.SYSTEM),
             accentIndex = prefs.getInt(KEY_ACCENT, 0),
             useDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
-            showWeekend = prefs.getBoolean(KEY_WEEKEND, true),
+            showSaturday = prefs.getBoolean(KEY_SATURDAY, legacyShowWeekend),
+            showSunday = prefs.getBoolean(KEY_SUNDAY, legacyShowWeekend),
             currentWeekOverride = prefs.getInt(KEY_WEEK_OVERRIDE, 0),
             studentName = prefs.getString(KEY_STUDENT, "").orEmpty(),
             reminderEnabled = prefs.getBoolean(KEY_REMINDER_ENABLED, false),
@@ -45,7 +49,8 @@ internal class SettingsStore(context: Context) {
             .putString(KEY_THEME, settings.themeMode.name)
             .putInt(KEY_ACCENT, settings.accentIndex)
             .putBoolean(KEY_DYNAMIC_COLOR, settings.useDynamicColor)
-            .putBoolean(KEY_WEEKEND, settings.showWeekend)
+            .putBoolean(KEY_SATURDAY, settings.showSaturday)
+            .putBoolean(KEY_SUNDAY, settings.showSunday)
             .putInt(KEY_WEEK_OVERRIDE, settings.currentWeekOverride)
             .putString(KEY_STUDENT, settings.studentName)
             .putBoolean(KEY_REMINDER_ENABLED, settings.reminderEnabled)
@@ -121,7 +126,10 @@ internal class SettingsStore(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_ACCENT = "accent_index"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
+        /** 旧版总开关，仅作为新开关的默认值来源，不再写入 */
         const val KEY_WEEKEND = "show_weekend"
+        const val KEY_SATURDAY = "show_saturday"
+        const val KEY_SUNDAY = "show_sunday"
         const val KEY_WEEK_OVERRIDE = "week_override"
         const val KEY_STUDENT = "student_name"
         const val KEY_REMINDER_ENABLED = "reminder_enabled"

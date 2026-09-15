@@ -57,15 +57,15 @@ fun WeekScreen(
     modifier: Modifier = Modifier
 ) {
     val p = AppTheme.colors
-    val days = remember(settings.showWeekend) {
-        if (settings.showWeekend) (1..7).toList() else (1..5).toList()
-    }
+    val days = remember(settings.showSaturday, settings.showSunday) { settings.visibleDays }
     val weekCourses = remember(courses, week, days) {
         courses.filter { it.isActiveInWeek(week) && it.dayOfWeek in days }
     }
     val maxSection = remember(courses) { courses.maxOfOrNull { it.endSection } ?: 0 }
     val sectionCount = maxOf(settings.sectionCount, maxSection).coerceAtLeast(8)
     val dates = remember(settings.termStartDate, week) { weekDatesOf(settings, week) }
+    // 网格按 days 的顺序取日期；隐藏周六时若仍用整周日期去索引，星期与日期会错位
+    val visibleDates = remember(dates, days) { days.map { dates.getOrNull(it - 1) } }
     val today = remember { LocalDate.now() }
     val todayInThisWeek = dates.any { it == today }
 
@@ -130,7 +130,7 @@ fun WeekScreen(
                 settings = settings,
                 sectionCount = sectionCount,
                 today = if (todayInThisWeek) today else null,
-                weekDates = dates,
+                weekDates = visibleDates,
                 onCourseClick = onCourseClick,
                 onEmptyAreaClick = { day, section -> onEmptyAreaClick(day, section) },
                 modifier = Modifier
