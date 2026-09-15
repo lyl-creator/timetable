@@ -112,6 +112,28 @@ fun CourseEditorSheet(
     }
 
     val sectionOptions = (1..maxOf(settings.sectionCount, 12)).toList()
+
+    /**
+     * 点击节次：未选中则并入当前区间，已选中则移出区间。
+     * 取消端点即收缩区间；取消中间节时收缩到前半段（保证节次始终连续）。
+     */
+    fun toggleSection(section: Int) {
+        val count = endSection - startSection + 1
+        when {
+            section in startSection..endSection -> {
+                if (count <= 1) return
+                when (section) {
+                    startSection -> startSection += 1
+                    endSection -> endSection -= 1
+                    else -> endSection = section - 1
+                }
+            }
+
+            section < startSection -> startSection = section
+            else -> endSection = section
+        }
+    }
+
     val canSave = name.isNotBlank() && when (mode) {
         WeekEditMode.RANGE -> true
         WeekEditMode.CUSTOM -> customWeeks.isNotEmpty()
@@ -246,13 +268,7 @@ fun CourseEditorSheet(
                     ChoiceChip(
                         text = s.toString(),
                         selected = s in startSection..endSection,
-                        onClick = {
-                            when {
-                                s < startSection -> startSection = s
-                                s > endSection -> endSection = s
-                                else -> Unit
-                            }
-                        }
+                        onClick = { toggleSection(s) }
                     )
                 }
             }
@@ -265,6 +281,12 @@ fun CourseEditorSheet(
                             .orEmpty(),
                 style = AppType.Footnote,
                 color = p.textSecondary
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "点击选择节次，再次点击即可取消；节次需保持连续",
+                style = AppType.Caption1,
+                color = p.textTertiary
             )
 
             Spacer(Modifier.height(20.dp))
@@ -348,7 +370,7 @@ fun CourseEditorSheet(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(set.base)
+                            .background(set.accent(true))
                             .then(if (selected) Modifier.border(2.5.dp, p.textPrimary, CircleShape) else Modifier)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },

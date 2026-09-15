@@ -1,5 +1,6 @@
 package com.lyl.timetable.ui.screens
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,13 +59,13 @@ import com.lyl.timetable.ui.components.LargeTitleHeader
 import com.lyl.timetable.ui.components.RowItem
 import com.lyl.timetable.ui.components.RowSeparator
 import com.lyl.timetable.ui.components.SegmentedPicker
+import com.lyl.timetable.ui.components.Stepper
 import com.lyl.timetable.ui.components.AppSwitch
 import com.lyl.timetable.ui.theme.AccentOptions
 import com.lyl.timetable.ui.theme.AppDimens
 import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.AppType
 import com.lyl.timetable.ui.theme.courseColor
-import com.lyl.timetable.ui.theme.groupCard
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -94,7 +96,6 @@ fun SettingsScreen(
     var checking by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showWeeksDialog by remember { mutableStateOf(false) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showCourseList by remember { mutableStateOf(false) }
 
@@ -105,7 +106,7 @@ fun SettingsScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = AppDimens.ScreenPadding),
-        contentPadding = PaddingValues(top = 6.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(AppDimens.GroupGap)
     ) {
         item {
@@ -127,9 +128,16 @@ fun SettingsScreen(
                 RowSeparator()
                 RowItem(
                     title = "学期总周数",
-                    value = "${settings.totalWeeks} 周",
-                    showChevron = true,
-                    onClick = { showWeeksDialog = true }
+                    subtitle = "决定周次选择范围",
+                    trailing = {
+                        Stepper(
+                            value = settings.totalWeeks,
+                            onValueChange = { onSettingsChange(settings.copy(totalWeeks = it)) },
+                            range = 4..31,
+                            suffix = " 周",
+                            label = "学期总周数"
+                        )
+                    }
                 )
                 RowSeparator()
                 RowItem(
@@ -177,6 +185,22 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+                RowSeparator()
+                RowItem(
+                    title = "系统取色",
+                    subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        "跟随壁纸自动生成配色（Material You）"
+                    } else {
+                        "需要 Android 12 及以上"
+                    },
+                    trailing = {
+                        AppSwitch(
+                            checked = settings.useDynamicColor &&
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+                            onCheckedChange = { onSettingsChange(settings.copy(useDynamicColor = it)) }
+                        )
+                    }
+                )
                 RowSeparator()
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text("强调色", style = AppType.Body, color = p.textPrimary)
@@ -335,38 +359,6 @@ fun SettingsScreen(
         }
     }
 
-    // ---------------- 总周数 ----------------
-    if (showWeeksDialog) {
-        var current by remember { mutableStateOf(settings.totalWeeks.toFloat()) }
-        AlertDialog(
-            onDismissRequest = { showWeeksDialog = false },
-            title = { Text("学期总周数") },
-            text = {
-                Column {
-                    Text(
-                        text = current.toInt().toString(),
-                        style = AppType.Title1,
-                        color = p.accent
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Slider(
-                        value = current,
-                        onValueChange = { current = it },
-                        valueRange = 4f..31f,
-                        steps = 26
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onSettingsChange(settings.copy(totalWeeks = current.toInt().coerceIn(4, 31)))
-                    showWeeksDialog = false
-                }) { Text("确定") }
-            },
-            dismissButton = { TextButton(onClick = { showWeeksDialog = false }) { Text("取消") } }
-        )
-    }
-
     // ---------------- 清空确认 ----------------
     if (showClearConfirm) {
         AlertDialog(
@@ -494,8 +486,8 @@ private fun CourseListSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.86f)
-                    .groupCard()
-                    .background(p.card)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 8.dp),

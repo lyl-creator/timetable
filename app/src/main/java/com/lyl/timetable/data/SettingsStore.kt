@@ -22,6 +22,7 @@ internal class SettingsStore(context: Context) {
                 ThemeMode.valueOf(prefs.getString(KEY_THEME, ThemeMode.SYSTEM.name)!!)
             }.getOrDefault(ThemeMode.SYSTEM),
             accentIndex = prefs.getInt(KEY_ACCENT, 0),
+            useDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true),
             showWeekend = prefs.getBoolean(KEY_WEEKEND, true),
             currentWeekOverride = prefs.getInt(KEY_WEEK_OVERRIDE, 0),
             studentName = prefs.getString(KEY_STUDENT, "").orEmpty()
@@ -37,6 +38,7 @@ internal class SettingsStore(context: Context) {
             .putString(KEY_TEMPLATE, encodeTemplate(settings.scheduleTemplate))
             .putString(KEY_THEME, settings.themeMode.name)
             .putInt(KEY_ACCENT, settings.accentIndex)
+            .putBoolean(KEY_DYNAMIC_COLOR, settings.useDynamicColor)
             .putBoolean(KEY_WEEKEND, settings.showWeekend)
             .putInt(KEY_WEEK_OVERRIDE, settings.currentWeekOverride)
             .putString(KEY_STUDENT, settings.studentName)
@@ -109,6 +111,7 @@ internal class SettingsStore(context: Context) {
         const val KEY_TEMPLATE = "schedule_template"
         const val KEY_THEME = "theme_mode"
         const val KEY_ACCENT = "accent_index"
+        const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_WEEKEND = "show_weekend"
         const val KEY_WEEK_OVERRIDE = "week_override"
         const val KEY_STUDENT = "student_name"

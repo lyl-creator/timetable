@@ -275,6 +275,8 @@ data class AppSettings(
     val scheduleTemplate: ScheduleTemplate = ScheduleTemplate(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val accentIndex: Int = 0,
+    /** Android 12 及以上使用系统动态取色（Material You） */
+    val useDynamicColor: Boolean = true,
     val showWeekend: Boolean = true,
     val currentWeekOverride: Int = 0,        // 0 表示按开学日期自动计算
     val studentName: String = ""

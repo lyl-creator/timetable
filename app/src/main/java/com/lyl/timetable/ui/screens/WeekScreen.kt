@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,7 +38,6 @@ import com.lyl.timetable.ui.components.TimetableGrid
 import com.lyl.timetable.ui.theme.AppDimens
 import com.lyl.timetable.ui.theme.AppTheme
 import com.lyl.timetable.ui.theme.AppType
-import com.lyl.timetable.ui.theme.groupCard
 import com.lyl.timetable.ui.weekDatesOf
 import com.lyl.timetable.ui.weekSubtitle
 import java.time.LocalDate
@@ -102,12 +103,13 @@ fun WeekScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .groupCard()
-                .padding(8.dp)
+                .weight(1f),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface
         ) {
             TimetableGrid(
                 courses = weekCourses,
@@ -118,7 +120,9 @@ fun WeekScreen(
                 weekDates = dates,
                 onCourseClick = onCourseClick,
                 onEmptyAreaClick = { day, section -> onEmptyAreaClick(day, section) },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
             )
         }
 
@@ -135,7 +139,7 @@ fun WeekScreen(
             modifier = Modifier.padding(horizontal = 6.dp)
         )
 
-        Spacer(Modifier.height(96.dp))
+        Spacer(Modifier.height(12.dp))
     }
 }
 

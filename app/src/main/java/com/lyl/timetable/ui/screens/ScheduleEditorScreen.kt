@@ -32,7 +32,7 @@ import com.lyl.timetable.data.TimeSlot
 import com.lyl.timetable.data.TimeText
 import com.lyl.timetable.ui.components.GlassIconButton
 import com.lyl.timetable.ui.components.GroupSection
-import com.lyl.timetable.ui.components.NumberInputDialog
+import com.lyl.timetable.ui.components.StepperDialog
 import com.lyl.timetable.ui.components.PillButton
 import com.lyl.timetable.ui.components.RowItem
 import com.lyl.timetable.ui.components.RowSeparator
@@ -314,11 +314,12 @@ fun ScheduleEditorScreen(
 
     // ---------------- 课间编辑 ----------------
     editingBreakAfter?.let { afterSection ->
-        NumberInputDialog(
+        StepperDialog(
             title = "第 $afterSection 节之后的课间",
             initial = template.breakMinutesAfter(afterSection),
             range = 0..120,
             suffix = " 分钟",
+            step = 1,
             hint = "该时长决定第 ${afterSection + 1} 节的开始时间",
             onDismiss = { editingBreakAfter = null },
             onConfirm = { minutes ->

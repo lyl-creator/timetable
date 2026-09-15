@@ -131,3 +131,52 @@ fun TimeInputDialog(
         }
     )
 }
+
+/**
+ * 步进器对话框：作息相关的数值统一用「− / 数字 / ＋」调整，
+ * 数字本身也可点击后直接键入。
+ */
+@Composable
+fun StepperDialog(
+    title: String,
+    initial: Int,
+    range: IntRange,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+    suffix: String = "",
+    step: Int = 1,
+    hint: String? = null
+) {
+    var value by remember { mutableStateOf(initial.coerceIn(range)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Stepper(
+                    value = value,
+                    onValueChange = { value = it },
+                    range = range,
+                    suffix = suffix,
+                    step = step,
+                    label = title
+                )
+                if (!hint.isNullOrBlank()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = hint,
+                        style = AppType.Footnote,
+                        color = AppTheme.colors.textSecondary
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}

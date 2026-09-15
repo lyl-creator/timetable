@@ -4,141 +4,127 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * 排版：对齐 iOS 的字号阶梯（SF Pro 尺寸表，pt → sp 按 1:1 映射）。
- * Android 上使用系统默认无衬线字体，字号、字重与行高按 iOS 规范取值。
+ * 排版：采用 Material 3 的字阶（Roboto / 系统无衬线），并保留语义化别名，
+ * 便于页面按「大标题 / 正文 / 脚注」等语义引用。
  */
 object AppType {
     val LargeTitle = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 41.sp,
-        letterSpacing = 0.4.sp
+        fontWeight = FontWeight.Normal,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+        letterSpacing = 0.sp
     )
     val Title1 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
-        lineHeight = 34.sp,
-        letterSpacing = 0.36.sp
+        lineHeight = 36.sp,
+        letterSpacing = 0.sp
     )
     val Title2 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = 0.35.sp
+        fontWeight = FontWeight.Normal,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
+        letterSpacing = 0.sp
     )
     val Title3 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Medium,
         fontSize = 20.sp,
-        lineHeight = 25.sp,
-        letterSpacing = 0.38.sp
+        lineHeight = 28.sp,
+        letterSpacing = 0.15.sp
     )
     val Headline = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp,
-        lineHeight = 22.sp,
-        letterSpacing = (-0.41).sp
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.15.sp
     )
     val Body = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
-        fontSize = 17.sp,
-        lineHeight = 22.sp,
-        letterSpacing = (-0.41).sp
-    )
-    val Callout = TextStyle(
-        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 21.sp,
-        letterSpacing = (-0.32).sp
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    )
+    val Callout = TextStyle(
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
+        letterSpacing = 0.4.sp
     )
     val Subheadline = TextStyle(
-        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
+        fontSize = 14.sp,
         lineHeight = 20.sp,
-        letterSpacing = (-0.24).sp
+        letterSpacing = 0.25.sp
     )
     val Footnote = TextStyle(
-        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        letterSpacing = (-0.08).sp
+        letterSpacing = 0.3.sp
     )
     val Caption1 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.sp
+        letterSpacing = 0.5.sp
     )
     val Caption2 = TextStyle(
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
-        lineHeight = 13.sp,
-        letterSpacing = 0.07.sp
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
     )
 }
 
-/** 映射到 Material3 语义槽位，使既有调用点直接获得 iOS 字号 */
+/** Material 3 语义槽位映射 */
 val AppTypography = Typography(
-    displayLarge = AppType.LargeTitle,
-    displayMedium = AppType.Title1,
-    displaySmall = AppType.Title2,
-    headlineLarge = AppType.Title1,
-    headlineMedium = AppType.Title2,
-    headlineSmall = AppType.Title3,
-    titleLarge = AppType.Title2,
-    titleMedium = AppType.Title3,
-    titleSmall = AppType.Headline,
+    displayLarge = AppType.LargeTitle.copy(fontSize = 45.sp, lineHeight = 52.sp),
+    displayMedium = AppType.LargeTitle.copy(fontSize = 36.sp, lineHeight = 44.sp),
+    displaySmall = AppType.LargeTitle,
+    headlineLarge = AppType.Title1.copy(fontSize = 32.sp, lineHeight = 40.sp),
+    headlineMedium = AppType.Title1,
+    headlineSmall = AppType.Title2,
+    titleLarge = AppType.Title3,
+    titleMedium = AppType.Headline,
+    titleSmall = AppType.Subheadline.copy(fontWeight = FontWeight.Medium),
     bodyLarge = AppType.Body,
     bodyMedium = AppType.Subheadline,
     bodySmall = AppType.Footnote,
-    labelLarge = AppType.Subheadline,
-    labelMedium = AppType.Footnote,
+    labelLarge = AppType.Subheadline.copy(fontWeight = FontWeight.Medium),
+    labelMedium = AppType.Caption1,
     labelSmall = AppType.Caption2
 )
 
-/**
- * 形状：iOS 分组列表圆角约 10pt，但 Liquid Glass 语言下容器更圆润，
- * 统一取较大的连续圆角以获得玻璃材质的柔和边缘。
- */
+/** Material 3 形状：4 / 8 / 12 / 16 / 28 */
 val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(30.dp)
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(28.dp)
 )
 
+/** Material 3 布局尺寸 */
 object AppDimens {
-    /** 分组卡片圆角 */
-    val GroupRadius = 26.dp
-    /** 卡片内小元素圆角 */
-    val InnerRadius = 14.dp
+    /** 卡片 / 分组的圆角（M3 large） */
+    val GroupRadius = 16.dp
+    /** 卡片内小元素圆角（M3 medium） */
+    val InnerRadius = 12.dp
     /** 胶囊 */
     val Capsule = 999.dp
-    /** 页面左右留白 */
-    val ScreenPadding = 20.dp
+    /** 页面左右留白（M3 规范 16dp） */
+    val ScreenPadding = 16.dp
     /** 分组之间间距 */
-    val GroupGap = 26.dp
-    /** 列表行最小高度（iOS 44pt） */
-    val RowHeight = 44.dp
+    val GroupGap = 12.dp
+    /** 列表行最小高度（M3 ListItem 单行 56dp） */
+    val RowHeight = 56.dp
     /** 分隔线左缩进 */
     val SeparatorInset = 16.dp
-    /** 底部 Tab Bar 高度 */
-    val TabBarHeight = 52.dp
+    /** 底部导航栏高度（M3 NavigationBar） */
+    val TabBarHeight = 80.dp
 }

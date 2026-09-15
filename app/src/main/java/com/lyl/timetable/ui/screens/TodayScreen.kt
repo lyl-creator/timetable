@@ -89,7 +89,7 @@ fun TodayScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize().padding(horizontal = AppDimens.ScreenPadding),
-        contentPadding = PaddingValues(top = 6.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(AppDimens.GroupGap)
     ) {
         item {
