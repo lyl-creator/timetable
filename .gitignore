@@ -11,6 +11,9 @@ captures/
 log
 *.log
 
+# ---- 本地发版产物（APK 与发版说明，只在本机保留）----
+release/
+
 # ---- Gradle ----
 .gradle/
 gradle-app.setting
